@@ -1,0 +1,8 @@
+node_modules/
+.svelte-kit/
+build/
+.vercel/
+dist/
+*.log
+.DS_Store
+vite.config.ts.timestamp-*
