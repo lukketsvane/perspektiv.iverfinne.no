@@ -271,6 +271,76 @@ describe('horisont = augehøgd (§9.4)', () => {
 	});
 });
 
+describe('panorama (M7): same kontrakt, stripe i staden for sirkel', () => {
+	function panoDirWithin(f: Frame, r: () => number, elevFrac: number, elevMax: number): V3 {
+		// tilfeldig asimut, elevasjon innanfor synleg band (relativt til pitch)
+		const az = (r() * 2 - 1) * Math.PI * 0.98;
+		const el = f.pitch + (r() * 2 - 1) * elevFrac * elevMax;
+		const ce = Math.cos(el);
+		// verdsretning frå yaw-basisen (yaw=0 i desse testane: fwd=−z, right=+x)
+		return vnorm([Math.sin(az) * ce, Math.sin(el), -Math.cos(az) * ce]);
+	}
+
+	it('round-trip pano-equi < 1e−9 rad', () => {
+		const f = makeFrame(
+			cam({ proj: 'pano-equi', fov: 180 * DEG, pitch: 0.2 }),
+			VIEW
+		);
+		const r = rng(77);
+		const elevMax = Math.min(Math.PI / 2, (VIEW.h / 2) / f.kv);
+		for (let i = 0; i < 1000; i++) {
+			const d = panoDirWithin(f, r, 0.93, elevMax);
+			const s = projectDir(f, d);
+			if (!s.visible) continue;
+			expect(angleBetween(d, unproject(f, s.x, s.y))).toBeLessThan(1e-9);
+		}
+	});
+
+	it('round-trip pano-cyl < 1e−9 rad', () => {
+		const f = makeFrame(cam({ proj: 'pano-cyl', fov: 150 * DEG, pitch: -0.1 }), VIEW);
+		const r = rng(78);
+		const elevMax = Math.atan(Math.min(1.4, (VIEW.h / 2) / f.kv));
+		for (let i = 0; i < 1000; i++) {
+			const d = panoDirWithin(f, r, 0.9, elevMax);
+			const s = projectDir(f, d);
+			if (!s.visible) continue;
+			expect(angleBetween(d, unproject(f, s.x, s.y))).toBeLessThan(1e-9);
+		}
+	});
+
+	it('horisonten er beinstrekt på cy ved τ=0; vertikalar har konstant x', () => {
+		for (const proj of ['pano-equi', 'pano-cyl'] as const) {
+			const f = makeFrame(cam({ proj, fov: 150 * DEG }), VIEW);
+			for (let i = 0; i < 36; i++) {
+				const a = (i / 36) * 2 * Math.PI;
+				const s = projectDir(f, [Math.cos(a), 0, Math.sin(a)]);
+				expect(s.visible).toBe(true);
+				expect(Math.abs(s.y - CY)).toBeLessThan(1e-9);
+			}
+			// vertikal verdsline: same skjerm-x for alle høgder
+			const xs: number[] = [];
+			for (const y of [200, 900, 1600, 2400]) {
+				const s = project(f, [1500, y, -2500]);
+				if (s.visible) xs.push(s.x);
+			}
+			expect(xs.length).toBeGreaterThan(2);
+			for (const x of xs) expect(Math.abs(x - xs[0])).toBeLessThan(1e-9);
+		}
+	});
+
+	it('stripa er periodisk: x + w gjev same retning (gjentekne vp)', () => {
+		const f = makeFrame(cam({ proj: 'pano-equi', fov: 160 * DEG }), VIEW);
+		const r = rng(80);
+		for (let i = 0; i < 100; i++) {
+			const x = r() * VIEW.w;
+			const y = CY + (r() - 0.5) * 300;
+			const d0 = unproject(f, x, y);
+			const d1 = unproject(f, x + VIEW.w, y);
+			expect(angleBetween(d0, d1)).toBeLessThan(1e-9);
+		}
+	});
+});
+
 describe('makeFrame-geometri', () => {
 	it('innskriven sirkel: R = 0.485·min(w,h), sentrum i midten', () => {
 		const f = makeFrame(cam(), VIEW);
