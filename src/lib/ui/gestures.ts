@@ -78,7 +78,10 @@ export type Action =
 	| { t: 'settings-patch'; patch: Record<string, boolean | string> }
 	| { t: 'proj-set'; proj: string }
 	// preset-lasting: null = tilfeldig val (t-tasten)
-	| { t: 'preset-load'; name: string | null };
+	| { t: 'preset-load'; name: string | null }
+	// verktøylinja: referanselås og mørk modus
+	| { t: 'lock-toggle' }
+	| { t: 'theme-toggle' };
 
 export type Host = {
 	now?: () => number;
@@ -848,6 +851,14 @@ export function createGestures(host: Host) {
 		}
 		if (k === 't') {
 			emit({ t: 'preset-load', name: null });
+			return true;
+		}
+		if (k === 'l') {
+			emit({ t: 'lock-toggle' });
+			return true;
+		}
+		if (k === 'i') {
+			emit({ t: 'theme-toggle' });
 			return true;
 		}
 		if ((key === 'Delete' || key === 'Backspace' || k === 'x') && host.hasSelection()) {
