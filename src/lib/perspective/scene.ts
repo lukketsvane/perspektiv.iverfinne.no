@@ -1,9 +1,44 @@
 // scene.ts — Box-ops (inkl. yaw), ray/golv, ray/obb, stabling (§2 treff, §3 datamodell)
 
-import { rotY, vadd, vscale, vsub, type V3 } from './projection';
+import { rotY, vadd, vscale, vsub, type CameraState, type V3 } from './projection';
+import { defaultCamera } from './camera';
 
 export type Box = { id: string; min: V3; size: V3; yaw: number }; // mm; yaw kring sentroid
 export type Ray = { origin: V3; dir: V3 };
+
+export type Settings = {
+	fit: 'inscribe' | 'cover';
+	gridX: boolean;
+	gridY: boolean;
+	gridZ: boolean;
+	floor: boolean;
+	horizon: boolean;
+	vps: boolean;
+	jitter: boolean;
+	moduleTicks: boolean;
+	maskFaces: boolean;
+};
+
+export type Doc = { version: 1; boxes: Box[]; camera: CameraState; settings: Settings };
+
+export function defaultSettings(): Settings {
+	return {
+		fit: 'inscribe',
+		gridX: true,
+		gridY: true,
+		gridZ: true,
+		floor: true,
+		horizon: true,
+		vps: true,
+		jitter: false,
+		moduleTicks: false,
+		maskFaces: false
+	};
+}
+
+export function defaultDoc(): Doc {
+	return { version: 1, boxes: [], camera: defaultCamera(), settings: defaultSettings() };
+}
 export type Face = 'top' | 'bottom' | 'side';
 export type Hit = { box: Box; t: number; point: V3; normal: V3; face: Face };
 
