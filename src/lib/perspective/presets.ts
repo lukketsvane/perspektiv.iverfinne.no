@@ -30,7 +30,13 @@ export type PresetName =
 	| 'kjøkken'
 	| 'kontor'
 	| 'croquis'
-	| 'matbar';
+	| 'matbar'
+	| 'sirkus'
+	| 'hamnekai'
+	| 'leikeplass'
+	| 'museum'
+	| 'bilverkstad'
+	| 'festsal';
 
 export const PRESET_NAMES: PresetName[] = [
 	'folkemengd',
@@ -52,7 +58,13 @@ export const PRESET_NAMES: PresetName[] = [
 	'kjøkken',
 	'kontor',
 	'croquis',
-	'matbar'
+	'matbar',
+	'sirkus',
+	'hamnekai',
+	'leikeplass',
+	'museum',
+	'bilverkstad',
+	'festsal'
 ];
 
 export type Preset = { boxes: Box[]; camera: CameraState };
@@ -461,6 +473,18 @@ function stall(rng: Rng): Preset {
 			)
 		);
 	}
+	// stallklutter: høyballar, bøtter, fôrtrau
+	for (let i = 0; i < ri(rng, 2, 3); i++) {
+		const hx = r(rng, -3400, 3400);
+		const hz = r(rng, -2600, 2600);
+		const hy = r(rng, 0, Math.PI * 2);
+		boxes.push(bx(hx, 0, hz, 900, 450, 500, hy));
+		if (rng() < 0.5) boxes.push(bx(hx + r(rng, -150, 150), 450, hz + r(rng, -120, 120), 820, 400, 460, hy + r(rng, -0.25, 0.25)));
+	}
+	for (let i = 0; i < ri(rng, 1, 3); i++) {
+		boxes.push(bx(r(rng, -3200, 3200), 0, r(rng, -2400, 2400), 300, 320, 300, r(rng, 0, 1))); // bøtte
+	}
+	boxes.push(bx(r(rng, -2800, 2800), 0, r(rng, -2000, 2000), 700, 420, 1500, r(rng, 0, Math.PI * 2))); // fôrtrau
 	const first = pts[0] ?? [0, 0];
 	const camera = pick(rng, [
 		// ståande blant hestane
@@ -488,6 +512,15 @@ function hovudstudie(rng: Rng): Preset {
 		if (i === 0) topHead = [x, ph + 145, z];
 	}
 	boxes.push(person(rng, r(rng, -2400, 2400), r(rng, 1800, 2600), r(rng, 2.4, 3.9), 'staande'));
+	// studioklutter: arbeidsbord med verktøy og krakk bak sokklane
+	const tbx = r(rng, -2600, 2600);
+	const tbz = r(rng, -2600, -2100);
+	const tby = r(rng, -0.2, 0.2);
+	boxes.push(bx(tbx, 0, tbz, 1250, 850, 600, tby));
+	for (let i = 0; i < ri(rng, 2, 3); i++) {
+		boxes.push(bx(tbx + r(rng, -450, 450), 850, tbz + r(rng, -170, 170), r(rng, 140, 300), r(rng, 60, 220), r(rng, 120, 260), r(rng, 0, Math.PI)));
+	}
+	boxes.push(bx(tbx + r(rng, 900, 1200), 0, tbz + r(rng, -200, 200), 360, 440, 360, r(rng, 0, 1))); // krakk
 	const camera = pick(rng, [
 		// teiknaren sin plass: i hovudhøgd, tett på
 		lookFrom([topHead[0] + 1400, topHead[1] + 100, topHead[2] + 1600], topHead, 195),
@@ -513,6 +546,13 @@ function figurrekkje(rng: Rng): Preset {
 	const sxp = r(rng, -2500, 2500);
 	boxes.push(bx(sxp, 0, 2000, 500, 500, 500, r(rng, 0, 0.4)));
 	boxes.push(bx(sxp, 500, 2000, 450, 450, 450, r(rng, 0.2, 0.7)));
+	// teiknaren som observerer rekkja, bak eige staffeli
+	const ax = r(rng, -1600, 1600);
+	const az = r(rng, 2900, 3600);
+	const tw = Math.atan2(-ax, -az);
+	boxes.push(bx(ax, 450, az, 720, 1300, 90, tw)); // staffeliplate
+	boxes.push(bx(ax - Math.sin(tw) * 260, 0, az - Math.cos(tw) * 260, 80, 1800, 80, tw)); // støttestolpe
+	boxes.push(person(rng, ax - Math.sin(tw) * 700, az - Math.cos(tw) * 700, tw, 'staande'));
 	const camera = pick(rng, [
 		// klassisk: ståande rett framfor rekkja
 		lookFrom([0, 1780, 3200], [0, 1300, 0], 220),
@@ -780,6 +820,17 @@ function containerhamn(rng: Rng): Preset {
 		);
 	}
 	const gapX = x0 + (C[0] + gate) / 2;
+	// hamneklutter i gata: pallar med last og oljefat
+	for (let i = 0; i < ri(rng, 2, 3); i++) {
+		const px = gapX + r(rng, -1100, 1100);
+		const pz = z0 + r(rng, -1500, (perRow - 1) * (C[2] + 900) + 1500);
+		const py = r(rng, 0, Math.PI * 2);
+		boxes.push(bx(px, 0, pz, 1200, 150, 1000, py));
+		if (rng() < 0.7) boxes.push(bx(px, 150, pz, r(rng, 700, 1000), r(rng, 450, 800), r(rng, 600, 850), py + r(rng, -0.15, 0.15)));
+	}
+	for (let i = 0; i < ri(rng, 1, 2); i++) {
+		boxes.push(bx(gapX + r(rng, -1300, 1300), 0, z0 + r(rng, 0, (perRow - 1) * (C[2] + 900)), 460, 720, 460, 0));
+	}
 	const camera = pick(rng, [
 		// i containergata: stålveggane sveipar i fiskeauget
 		lookFrom([gapX + r(rng, -600, 600), 1650, z0 - 3400], [gapX, 2200, z0 + perRow * (C[2] + 900) * 0.7], 230),
@@ -1107,6 +1158,13 @@ function perrong(rng: Rng): Preset {
 		if (rng() < 0.6) boxes.push(bx(px + r(rng, 350, 550), 0, pz + r(rng, -200, 200), 380, r(rng, 550, 750), 250, r(rng, 0, 0.6))); // koffert
 	}
 	if (rng() < 0.5) boxes.push(bx(r(rng, -500, 1000), 0, r(rng, -span / 2, span / 2), 650, 950, 1100, r(rng, -0.2, 0.2))); // tralle
+	// perrongklutter: skiltstolpar og automat
+	for (let i = 0; i < 2; i++) {
+		const sz2 = r(rng, -span / 2 + 800, span / 2 - 800);
+		boxes.push(bx(650, 0, sz2, 90, 2400, 90));
+		boxes.push(bx(650, 1950, sz2, 700, 450, 80, r(rng, -0.1, 0.1)));
+	}
+	if (rng() < 0.7) boxes.push(bx(2950, 0, r(rng, -span / 2 + 600, span / 2 - 600), 900, 1850, 750, 0)); // automat
 	const camera = pick(rng, [
 		// på perrongen: togveggen og søylene som kløft
 		lookFrom([r(rng, -300, 600), 1660, span / 2 + 2200], [-1200, 1700, -span / 4], 228),
@@ -1182,6 +1240,15 @@ function kontor(rng: Rng): Preset {
 			const pz = cz + perp[1] * 780 * a + dir[1] * 480 * b;
 			boxes.push(bx(px, 0, pz, 1400, 720, 700, yaw)); // pult
 			boxes.push(bx(px + dir[0] * 60 * b, 720, pz + dir[1] * 60 * b, 540, 350, 70, yaw)); // skjerm
+			// kontorklutter på plata: kopp og papirbunke
+			if (rng() < 0.5) {
+				const cu = r(rng, -520, 520);
+				boxes.push(bx(px + perp[0] * cu, 720, pz + perp[1] * cu, 90, 110, 90, 0));
+			}
+			if (rng() < 0.4) {
+				const pu = r(rng, -420, 420);
+				boxes.push(bx(px + perp[0] * pu - dir[0] * 180 * b, 720, pz + perp[1] * pu - dir[1] * 180 * b, 300, 40, 380, yaw + r(rng, -0.4, 0.4)));
+			}
 			if (rng() < 0.7) {
 				boxes.push(bx(px - dir[0] * 750 * b, 0, pz - dir[1] * 750 * b, 420, 450, 420, yaw)); // stol
 				const worker = person(rng, px - dir[0] * 720 * b, pz - dir[1] * 720 * b, b > 0 ? yaw : yaw + Math.PI, 'sitgolv');
@@ -1336,6 +1403,448 @@ function matbar(rng: Rng): Preset {
 	return { boxes, camera };
 }
 
+// --- sirkus: manesjering, elefant med ryttar, artist på podium, tribune i boge, master med banner ---
+function sirkus(rng: Rng): Preset {
+	const boxes: Box[] = [];
+	const ringR = r(rng, 4200, 4800);
+	const segs = 14;
+	const segL = (Math.PI * 2 * ringR) / segs - 260;
+	for (let i = 0; i < segs; i++) {
+		const a = (i / segs) * Math.PI * 2;
+		boxes.push(bx(Math.cos(a) * ringR, 0, Math.sin(a) * ringR, 320, r(rng, 380, 460), segL, -a));
+	}
+	// artist på podium i midten
+	const podX = r(rng, -700, 700);
+	const podZ = r(rng, -700, 700);
+	boxes.push(bx(podX, 0, podZ, 850, 650, 850, r(rng, 0, 0.6)));
+	const artist = person(rng, podX, podZ, r(rng, 0, Math.PI * 2), 'staande');
+	artist.min[1] = 650;
+	boxes.push(artist);
+	// elefant med ryttar, tangentielt rundt manesjen
+	const ea = r(rng, 0, Math.PI * 2);
+	const eR = ringR * 0.58;
+	const ex = Math.cos(ea) * eR;
+	const ez = Math.sin(ea) * eR;
+	const eyaw = -ea;
+	const edir: [number, number] = [Math.sin(eyaw), Math.cos(eyaw)];
+	const eside: [number, number] = [Math.cos(eyaw), -Math.sin(eyaw)];
+	boxes.push(bx(ex, 1400, ez, 1500, 1400, 2700, eyaw)); // kropp
+	for (const [a2, b2] of [
+		[1, 1],
+		[1, -1],
+		[-1, 1],
+		[-1, -1]
+	] as Array<[number, number]>) {
+		boxes.push(
+			bx(ex + eside[0] * 480 * a2 + edir[0] * 950 * b2, 0, ez + eside[1] * 480 * a2 + edir[1] * 950 * b2, 340, 1400, 340, eyaw)
+		);
+	}
+	boxes.push(bx(ex + edir[0] * 1650, 1900, ez + edir[1] * 1650, 620, 780, 650, eyaw + r(rng, -0.2, 0.2))); // hovud
+	boxes.push(bx(ex + edir[0] * 2120, 900, ez + edir[1] * 2120, 220, 1080, 220, eyaw)); // snabel
+	const rider = person(rng, ex - edir[0] * 300, ez - edir[1] * 300, eyaw, 'sitgolv');
+	rider.min[1] = 2800;
+	boxes.push(rider);
+	// tribune: to sektorar med benkerader i trapp, publikum vend mot manesjen
+	const tribA0 = r(rng, 0, Math.PI * 2);
+	for (const sector of [0, 1]) {
+		const baseA = tribA0 + sector * r(rng, 2.2, 2.9);
+		for (let row = 0; row < 2; row++) {
+			const rad = ringR + 1900 + row * 1250;
+			for (let bI = 0; bI < 3; bI++) {
+				const a = baseA + (bI - 1) * (2400 / rad);
+				const bxp = Math.cos(a) * rad;
+				const bzp = Math.sin(a) * rad;
+				boxes.push(bx(bxp, row * 480, bzp, 480, 420, 2200, -a));
+				for (let pI = 0; pI < ri(rng, 1, 2); pI++) {
+					const off = r(rng, -800, 800);
+					const tang: [number, number] = [-Math.sin(a), Math.cos(a)];
+					const sp = person(rng, bxp + tang[0] * off, bzp + tang[1] * off, Math.atan2(-bxp, -bzp) + r(rng, -0.2, 0.2), 'sitgolv');
+					sp.min[1] = row * 480 + 420;
+					boxes.push(sp);
+				}
+			}
+		}
+	}
+	// master og banner over manesjen
+	const mA = r(rng, 0, Math.PI);
+	const m1: [number, number] = [Math.cos(mA) * (ringR + 700), Math.sin(mA) * (ringR + 700)];
+	boxes.push(bx(m1[0], 0, m1[1], 260, 6800, 260));
+	boxes.push(bx(-m1[0], 0, -m1[1], 260, 6800, 260));
+	boxes.push(bx(0, 6100, 0, 350, 550, (ringR + 700) * 1.8, Math.atan2(-2 * m1[0], -2 * m1[1])));
+	const toE = Math.atan2(ex - podX, ez - podZ);
+	const camera = pick(rng, [
+		// ringside: froskeblikk over ringkanten mot elefanten
+		lookFrom([Math.cos(ea + 0.55) * (ringR + 350), 620, Math.sin(ea + 0.55) * (ringR + 350)], [ex, 2300, ez], 238),
+		// i manesjen, bak artisten: podium nær, elefant og tribune i eitt sveip
+		lookFrom([podX - Math.sin(toE) * 1150, 1660, podZ - Math.cos(toE) * 1150], [ex, 1900, ez], 230),
+		// øvste benkerad: ned i manesjen
+		lookFrom([Math.cos(tribA0) * (ringR + 3300), 2400, Math.sin(tribA0) * (ringR + 3300)], [podX, 700, podZ], 228),
+		// blant publikum på fremste rad, over hovuda
+		lookFrom([Math.cos(tribA0 + 0.85) * (ringR + 1550), 1760, Math.sin(tribA0 + 0.85) * (ringR + 1550)], [(ex + podX) / 2, 1300, (ez + podZ) / 2], 232)
+	]);
+	return { boxes, camera };
+}
+
+// --- hamnekai: fortøygd båt, kaikant med pullertar, fiskekassestablar, fiskarar i arbeid ---
+function hamnekai(rng: Rng): Preset {
+	const boxes: Box[] = [];
+	const kaiX = r(rng, 2200, 2800); // kanten ligg langs z ved x=kaiX
+	const L = r(rng, 14000, 18000);
+	boxes.push(bx(kaiX, 0, 0, 700, 280, L)); // kantstein
+	for (let z = -L / 2 + 1200; z <= L / 2 - 1200; z += r(rng, 2800, 3600)) {
+		boxes.push(bx(kaiX - 550, 0, z, 340, 560, 340, r(rng, 0, 0.4))); // pullert
+	}
+	// båten: skroget ruvar over kaia (fribord over hovudhøgd), styrhus, mast, dekkslast
+	const bz = r(rng, -2500, 2500);
+	const hullW = r(rng, 2300, 2700);
+	const hullL = r(rng, 6500, 8000);
+	const hullH = r(rng, 2200, 2500);
+	const hullX = kaiX + 700 + hullW / 2;
+	boxes.push(bx(hullX, 0, bz, hullW, hullH, hullL, r(rng, -0.03, 0.03)));
+	boxes.push(bx(hullX + r(rng, -250, 250), hullH, bz - hullL / 2 + r(rng, 1200, 1800), 1500, 1150, 1700)); // styrhus
+	boxes.push(bx(hullX, hullH, bz + r(rng, 500, 1500), 170, 4600, 170)); // mast
+	for (let i = 0; i < ri(rng, 2, 3); i++) {
+		boxes.push(
+			bx(hullX + r(rng, -600, 600), hullH, bz + r(rng, -hullL / 2 + 900, hullL / 2 - 900), r(rng, 500, 750), r(rng, 380, 600), r(rng, 500, 800), r(rng, 0, Math.PI))
+		);
+	}
+	// liten open skiff lenger borte langs kaia: djupn i rekkja
+	const skZ = bz + (rng() < 0.5 ? -1 : 1) * r(rng, 6500, 8000);
+	boxes.push(bx(kaiX + 1700, 0, skZ, 1500, 900, 3800, r(rng, -0.08, 0.08)));
+	// fiskekassestablar på kaia
+	for (let i = 0; i < ri(rng, 3, 4); i++) {
+		const sx = kaiX - r(rng, 1500, 3800);
+		const sz = bz + r(rng, -5000, 5000);
+		const syaw = r(rng, 0, Math.PI * 2);
+		for (let k = 0; k < ri(rng, 2, 4); k++) {
+			boxes.push(bx(sx + r(rng, -60, 60), k * 300, sz + r(rng, -60, 60), 760, 300, 520, syaw + r(rng, -0.12, 0.12)));
+		}
+	}
+	for (let i = 0; i < ri(rng, 1, 3); i++) {
+		boxes.push(bx(kaiX - r(rng, 1200, 4200), 0, bz + r(rng, -6000, 6000), 460, 720, 460, 0)); // tønne
+	}
+	// davit på kanten, armen ut over skroget
+	const dvZ = bz + r(rng, -3500, 3500);
+	boxes.push(bx(kaiX - 300, 0, dvZ, 300, 3400, 300));
+	boxes.push(bx(kaiX + 500, 3200, dvZ, 1900, 200, 200));
+	// fiskarar: bøygd over kassane, samtalepar, gåande, hukande ved pullerten
+	boxes.push(person(rng, kaiX - r(rng, 1600, 2400), bz + r(rng, -1200, 1200), r(rng, 0, Math.PI * 2), 'boygd'));
+	const cpx = kaiX - r(rng, 3000, 4200);
+	const cpz = bz + r(rng, 2000, 4500);
+	const ca = r(rng, 0, Math.PI * 2);
+	boxes.push(person(rng, cpx, cpz, ca, 'staande'));
+	boxes.push(person(rng, cpx + Math.sin(ca) * 780, cpz + Math.cos(ca) * 780, ca + Math.PI, rng() < 0.5 ? 'staande' : 'lener'));
+	boxes.push(person(rng, kaiX - r(rng, 1000, 2000), bz - r(rng, 3000, 5500), r(rng, 0, Math.PI * 2), 'gaande'));
+	if (rng() < 0.6) boxes.push(person(rng, kaiX - 700, bz + r(rng, -5500, 5500), r(rng, 0, Math.PI * 2), 'hukande'));
+	if (rng() < 0.4) boxes.push(...dog(rng, kaiX - r(rng, 2000, 3500), bz + r(rng, -4000, 4000), r(rng, 0, Math.PI * 2)));
+	const camera = pick(rng, [
+		// på kaia tett ved skroget: stålveggen ruvar over hovudet
+		lookFrom([kaiX - 1900, 1650, bz + r(rng, 3200, 4500)], [hullX - 600, 2100, bz - 1500], 232),
+		// froskeblikk ved fiskekassa: stabelen og masta tårnar
+		lookFrom([kaiX - 2200, 480, bz - r(rng, 2500, 4000)], [hullX, 2900, bz + 1200], 242),
+		// frå dekket: ned på kaiarbeidarane
+		lookFrom([hullX + 300, hullH + 1650, bz - r(rng, 1500, 2500)], [kaiX - 2600, 400, bz + 2500], 234),
+		// langs kanten: pullertrekkja som kurve, båten som vegg
+		lookFrom([kaiX - 800, 1620, bz - 6500], [kaiX - 200, 1400, bz + 5000], 236)
+	]);
+	return { boxes, camera };
+}
+
+// --- leikeplass: klatrestativ, huske, sandkasse, sklietårn — born i barneskala, foreldre ved benken ---
+function leikeplass(rng: Rng): Preset {
+	const boxes: Box[] = [];
+	const kid = () => r(rng, 0.58, 0.74);
+	// klatrestativ: 3×3 stolpegrid med toppbjelkar
+	const kx = r(rng, -3500, -2500);
+	const kz = r(rng, -1500, 1500);
+	const g = 950;
+	for (let i = 0; i < 3; i++) {
+		for (let j = 0; j < 3; j++) {
+			if ((i + j) % 2 === 1 && rng() < 0.4) continue;
+			boxes.push(bx(kx + (i - 1) * g, 0, kz + (j - 1) * g, 90, 1900, 90));
+		}
+	}
+	for (let j = 0; j < 3; j++) boxes.push(bx(kx, 1900, kz + (j - 1) * g, 2 * g + 90, 80, 80));
+	for (let i = 0; i < 3; i += 2) boxes.push(bx(kx + (i - 1) * g, 1900, kz, 80, 80, 2 * g + 90));
+	const cl = person(rng, kx + r(rng, -550, 550), kz + r(rng, -550, 550), r(rng, 0, Math.PI * 2), 'hukande', kid());
+	cl.min[1] = 1000; // klatrar halvvegs oppe
+	boxes.push(cl);
+	boxes.push(person(rng, kx + r(rng, -700, 700), kz + g + 550, r(rng, 0, Math.PI * 2), 'staande', kid()));
+	// huskestativ: to stolpar, toppbjelke, to seter — barn på det eine
+	const hx = r(rng, 2400, 3400);
+	const hz = r(rng, -2200, -1000);
+	const hyaw = r(rng, -0.3, 0.3);
+	const hperp: [number, number] = [Math.cos(hyaw), -Math.sin(hyaw)];
+	boxes.push(bx(hx - hperp[0] * 1700, 0, hz - hperp[1] * 1700, 150, 2400, 150));
+	boxes.push(bx(hx + hperp[0] * 1700, 0, hz + hperp[1] * 1700, 150, 2400, 150));
+	boxes.push(bx(hx, 2400, hz, 3700, 140, 140, hyaw));
+	for (const s of [-1, 1]) {
+		boxes.push(bx(hx + hperp[0] * 800 * s, 620, hz + hperp[1] * 800 * s, 460, 90, 240, hyaw));
+	}
+	const sw = person(rng, hx + hperp[0] * 800, hz + hperp[1] * 800, hyaw, 'sitgolv', kid());
+	sw.min[1] = 710;
+	boxes.push(sw);
+	// sandkasse med born
+	const sx = r(rng, -400, 600);
+	const sz = r(rng, 1400, 2400);
+	const S = r(rng, 2400, 3000);
+	boxes.push(bx(sx, 0, sz - S / 2, S + 200, 260, 200));
+	boxes.push(bx(sx, 0, sz + S / 2, S + 200, 260, 200));
+	boxes.push(bx(sx - S / 2, 0, sz, 200, 260, S - 200));
+	boxes.push(bx(sx + S / 2, 0, sz, 200, 260, S - 200));
+	boxes.push(person(rng, sx + r(rng, -S / 4, S / 4), sz + r(rng, -S / 4, S / 4), r(rng, 0, Math.PI * 2), 'sitgolv', kid()));
+	boxes.push(person(rng, sx + r(rng, -S / 4, S / 4), sz + r(rng, -S / 4, S / 4), r(rng, 0, Math.PI * 2), 'hukande', kid()));
+	if (rng() < 0.5) boxes.push(bx(sx + r(rng, -S / 3, S / 3), 0, sz + r(rng, -S / 3, S / 3), 220, 160, 220, r(rng, 0, 1))); // bøtte
+	// sklietårn med rekkverk, to steg og barn på toppen
+	const tx = r(rng, 1800, 2800);
+	const tz = r(rng, 1600, 2600);
+	boxes.push(bx(tx, 0, tz, 1100, 1350, 1100, 0));
+	boxes.push(bx(tx, 1350, tz - 520, 1100, 620, 80));
+	boxes.push(bx(tx - 850, 0, tz, 600, 450, 500));
+	boxes.push(bx(tx - 780, 450, tz, 460, 450, 500));
+	const tk = person(rng, tx, tz + 250, r(rng, 0, Math.PI * 2), 'staande', kid());
+	tk.min[1] = 1350;
+	boxes.push(tk);
+	// benk med sitjande forelder + ståande forelder + hund
+	const bxp = r(rng, -1200, 0);
+	const bzp = r(rng, -3200, -2400);
+	boxes.push(bx(bxp, 0, bzp, 1600, 440, 550, r(rng, -0.15, 0.15)));
+	const par = person(rng, bxp + r(rng, -400, 400), bzp, r(rng, -0.3, 0.3), 'sitjande');
+	par.min[1] = 440;
+	par.size[1] -= 440;
+	boxes.push(par);
+	boxes.push(person(rng, bxp + r(rng, 900, 1500), bzp + r(rng, 200, 600), r(rng, -0.4, 0.4), 'staande'));
+	if (rng() < 0.6) boxes.push(...dog(rng, r(rng, -1500, 1500), r(rng, -800, 800), r(rng, 0, Math.PI * 2)));
+	for (let i = 0; i < ri(rng, 1, 3); i++) {
+		boxes.push(person(rng, r(rng, -2000, 2000), r(rng, -1200, 1200), r(rng, 0, Math.PI * 2), rng() < 0.6 ? 'gaande' : 'staande', kid()));
+	}
+	const camera = pick(rng, [
+		// barneauge midt på plassen: alt ruver
+		lookFrom([r(rng, -600, 600), 1000, r(rng, -400, 400)], [hx, 1500, hz], 234),
+		// forelderen på benken
+		lookFrom([bxp, 1250, bzp + 300], [sx, 700, sz], 226),
+		// froskeblikk under klatrestativet: stolpane mot himmelen
+		lookFrom([kx + 420, 420, kz - 320], [hx, 1900, hz], 244),
+		// frå sklietårnet: ned på sandkassa
+		lookFrom([tx - 330, 2500, tz - 330], [sx, 200, sz], 232)
+	]);
+	return { boxes, camera };
+}
+
+// --- museum: tre veggar, beist-skjelett på podium, sokklar med gjenstandar, rammer, vitjarar ---
+function museum(rng: Rng): Preset {
+	const boxes: Box[] = [];
+	const W = r(rng, 11000, 13000);
+	const D = r(rng, 8500, 10000);
+	const H = 4400;
+	const T = 150;
+	boxes.push(bx(0, 0, -D / 2 - T / 2, W + 2 * T, H, T));
+	boxes.push(bx(-W / 2 - T / 2, 0, 0, T, H, D));
+	boxes.push(bx(W / 2 + T / 2, 0, 0, T, H, D));
+	// beistet midt i salen, på lågt podium
+	const px = r(rng, -1500, 1500);
+	const pz = r(rng, -1200, 0);
+	const byaw = r(rng, 0, Math.PI * 2);
+	const bdir: [number, number] = [Math.sin(byaw), Math.cos(byaw)];
+	const bside: [number, number] = [Math.cos(byaw), -Math.sin(byaw)];
+	boxes.push(bx(px, 0, pz, 2600, 280, 5600, byaw)); // podium
+	boxes.push(bx(px, 1850, pz, 1600, 1500, 4200, byaw)); // ribbekasse — stor og umiskjenneleg
+	for (const [a, b] of [
+		[1, 1],
+		[1, -1],
+		[-1, 1],
+		[-1, -1]
+	] as Array<[number, number]>) {
+		boxes.push(bx(px + bside[0] * 480 * a + bdir[0] * 1450 * b, 280, pz + bside[1] * 480 * a + bdir[1] * 1450 * b, 340, 1570, 340, byaw));
+	}
+	boxes.push(bx(px + bdir[0] * 2400, 2700, pz + bdir[1] * 2400, 380, 1350, 380, byaw)); // hals
+	boxes.push(bx(px + bdir[0] * 2850, 3900, pz + bdir[1] * 2850, 520, 520, 1050, byaw + r(rng, -0.2, 0.2))); // hovud
+	boxes.push(bx(px - bdir[0] * 2250, 2100, pz - bdir[1] * 2250, 260, 300, 1000, byaw)); // hale
+	boxes.push(bx(px - bdir[0] * 2950, 1750, pz - bdir[1] * 2950, 200, 260, 700, byaw + r(rng, -0.25, 0.25))); // haletipp
+	// sokklar langs sidene med gjenstandar
+	let lastPlinth: [number, number] = [W / 4, 0];
+	for (let i = 0; i < ri(rng, 4, 6); i++) {
+		const side = i % 2 === 0 ? -1 : 1;
+		const sxp = side * (W / 2 - r(rng, 1300, 2000));
+		const szp = -D / 2 + 1400 + (i >> 1) * r(rng, 2400, 2900);
+		boxes.push(bx(sxp, 0, szp, 720, 1150, 720, r(rng, -0.15, 0.15)));
+		const kind = rng();
+		if (kind < 0.4) boxes.push(bx(sxp, 1150, szp, 300, 360, 320, r(rng, 0, Math.PI * 2))); // hovudstudie
+		else if (kind < 0.7) boxes.push(bx(sxp, 1150, szp, 260, r(rng, 380, 520), 260, r(rng, 0, 1))); // vase
+		else boxes.push(bx(sxp, 1150, szp, r(rng, 420, 520), r(rng, 240, 340), r(rng, 300, 420), r(rng, 0, Math.PI * 2))); // artefakt
+		lastPlinth = [sxp, szp];
+	}
+	// rammer på veggene
+	for (let i = 0; i < ri(rng, 4, 6); i++) {
+		const wall = ri(rng, 0, 2);
+		const fw = r(rng, 1100, 1900);
+		const fh = r(rng, 900, 1400);
+		if (wall === 0) boxes.push(bx(r(rng, -W / 2 + 1500, W / 2 - 1500), r(rng, 1300, 1800), -D / 2 + 60, fw, fh, 100));
+		else boxes.push(bx((wall === 1 ? -1 : 1) * (W / 2 - 60), r(rng, 1300, 1800), r(rng, -D / 2 + 1500, D / 2 - 1500), 100, fh, fw));
+	}
+	// monter og benk
+	boxes.push(bx(r(rng, -W / 4, W / 4), 0, D / 2 - r(rng, 1500, 2200), 850, 1750, 850, r(rng, -0.2, 0.2)));
+	const mbx = r(rng, -W / 4, W / 4);
+	const mbz = r(rng, 900, 1900);
+	boxes.push(bx(mbx, 0, mbz, 1700, 440, 600, r(rng, -0.1, 0.1)));
+	const sit = person(rng, mbx + r(rng, -400, 400), mbz, Math.atan2(px - mbx, pz - mbz), 'sitjande');
+	sit.min[1] = 440;
+	sit.size[1] -= 440;
+	boxes.push(sit);
+	// vitjarar: par framfor veggen, lener ved sokkelen, barn, vakt
+	const vx = r(rng, -W / 2 + 1900, -W / 2 + 2700);
+	const vz = r(rng, -900, 900);
+	boxes.push(person(rng, vx, vz, -Math.PI / 2, 'staande'));
+	boxes.push(person(rng, vx + r(rng, 450, 750), vz + r(rng, 500, 900), -Math.PI / 2 + r(rng, -0.3, 0.3), 'staande'));
+	boxes.push(person(rng, lastPlinth[0] * 0.72, lastPlinth[1] + r(rng, -400, 400), Math.atan2(lastPlinth[0] * 0.28, 0), 'lener'));
+	boxes.push(person(rng, px + bside[0] * 2400, pz + bside[1] * 2400, Math.atan2(-bside[0], -bside[1]), 'staande', r(rng, 0.6, 0.72)));
+	boxes.push(person(rng, r(rng, -1500, 1500), -D / 2 + 800, r(rng, -0.4, 0.4), 'staande'));
+	const camera = pick(rng, [
+		// under beistet: froskeblikk langs ribbekassa
+		lookFrom([px - bside[0] * 1950, 520, pz - bside[1] * 1950], [px + bdir[0] * 1600, 3500, pz + bdir[1] * 1600], 244),
+		// vitjarblikk: bak paret, mot veggen — beistet i periferien
+		lookFrom([vx + 1500, 1700, vz - 900], [vx - 900, 1500, vz + 300], 228),
+		// midt i salen: beistet fyller ramma, veggane sveipar
+		lookFrom([px * 0.3 + r(rng, -800, 800), 1680, pz + r(rng, 4300, 5200)], [px, 1700, pz - 400], 236),
+		// høgt hjørneblikk ned mot beistet
+		lookFrom([-W / 2 + 1200, 3600, D / 2 - 1200], [px + 800, 1300, pz], 230)
+	]);
+	return { boxes, camera };
+}
+
+// --- bilverkstad: bil på tosøyla løftebukk, mekanikar under, bil på golvet, dekkstablar, motorheis ---
+function bilverkstad(rng: Rng): Preset {
+	const boxes: Box[] = [];
+	const liftX = r(rng, -1200, 1200);
+	const liftZ = r(rng, -2200, -1200);
+	const lyaw = r(rng, -0.15, 0.15);
+	const ldir: [number, number] = [Math.sin(lyaw), Math.cos(lyaw)];
+	const lperp: [number, number] = [Math.cos(lyaw), -Math.sin(lyaw)];
+	boxes.push(bx(liftX - lperp[0] * 1500, 0, liftZ - lperp[1] * 1500, 320, 2500, 320, lyaw)); // søyle
+	boxes.push(bx(liftX + lperp[0] * 1500, 0, liftZ + lperp[1] * 1500, 320, 2500, 320, lyaw)); // søyle
+	boxes.push(bx(liftX, 1850, liftZ, 3100, 130, 260, lyaw)); // løftearmar
+	boxes.push(bx(liftX, 1980, liftZ, 1780, 620, 4400, lyaw)); // karosseri i lufta
+	boxes.push(bx(liftX - ldir[0] * 300, 2600, liftZ - ldir[1] * 300, 1620, 560, 2300, lyaw)); // kabin
+	for (const [a, b] of [
+		[1, 1],
+		[1, -1],
+		[-1, 1],
+		[-1, -1]
+	] as Array<[number, number]>) {
+		boxes.push(bx(liftX + lperp[0] * 800 * a + ldir[0] * 1420 * b, 1700, liftZ + lperp[1] * 800 * a + ldir[1] * 1420 * b, 250, 620, 620, lyaw));
+	}
+	boxes.push(person(rng, liftX + r(rng, -300, 300), liftZ + r(rng, -500, 500), r(rng, 0, Math.PI * 2), 'staande')); // mekanikar UNDER bilen
+	// bil på golvet med oppslått panser og bøygd mekanikar
+	const gcx = r(rng, 1900, 3200);
+	const gcz = r(rng, 900, 2100);
+	const gyaw = r(rng, -0.3, 0.3) + (rng() < 0.5 ? 0 : Math.PI / 2);
+	const gdir: [number, number] = [Math.sin(gyaw), Math.cos(gyaw)];
+	boxes.push(bx(gcx, 0, gcz, 1780, 1120, 4400, gyaw));
+	boxes.push(bx(gcx - gdir[0] * 300, 1120, gcz - gdir[1] * 300, 1620, 480, 2300, gyaw));
+	boxes.push(bx(gcx + gdir[0] * 1650, 1150, gcz + gdir[1] * 1650, 1500, 700, 120, gyaw)); // panser opp
+	boxes.push(person(rng, gcx + gdir[0] * 2650, gcz + gdir[1] * 2650, Math.atan2(-gdir[0], -gdir[1]), 'boygd'));
+	// dekkstablar
+	for (let i = 0; i < ri(rng, 2, 3); i++) {
+		const tx = r(rng, -4200, -2800);
+		const tz2 = r(rng, -800, 2400);
+		for (let k = 0; k < ri(rng, 3, 4); k++) {
+			boxes.push(bx(tx + r(rng, -50, 50), k * 250, tz2 + r(rng, -50, 50), 660, 250, 660, r(rng, 0, 0.8)));
+		}
+	}
+	// benk med verktøy, skap, fat, jekk
+	const wbz = r(rng, 3400, 4200);
+	const wbx = r(rng, -2500, -500);
+	boxes.push(bx(wbx, 0, wbz, 2200, 900, 700, r(rng, -0.06, 0.06)));
+	for (let i = 0; i < ri(rng, 2, 3); i++) {
+		boxes.push(bx(wbx + r(rng, -800, 800), 900, wbz + r(rng, -180, 180), r(rng, 160, 380), r(rng, 80, 300), r(rng, 140, 320), r(rng, 0, Math.PI)));
+	}
+	boxes.push(bx(r(rng, 500, 1500), 0, wbz - r(rng, 300, 900), 700, 950, 480, r(rng, 0, 0.5))); // verktøyskap
+	boxes.push(bx(r(rng, -1800, -600), 0, r(rng, -400, 800), 460, 720, 460, 0)); // fat
+	boxes.push(bx(liftX + r(rng, 1500, 2200), 0, liftZ + r(rng, 800, 1400), 350, 300, 950, r(rng, 0, Math.PI))); // jekk
+	// motorheis med hengande blokk
+	const ehx = r(rng, -3800, -2600);
+	const ehz = r(rng, -2600, -1600);
+	boxes.push(bx(ehx, 0, ehz, 950, 140, 1250, 0));
+	boxes.push(bx(ehx, 0, ehz - 400, 200, 2300, 200));
+	boxes.push(bx(ehx, 2150, ehz + 350, 180, 160, 1500));
+	boxes.push(bx(ehx, 1250, ehz + 900, 540, 500, 600, r(rng, 0, 0.4)));
+	if (rng() < 0.7) boxes.push(person(rng, ehx + r(rng, 700, 1100), ehz + r(rng, 300, 900), r(rng, 0, Math.PI * 2), 'hukande'));
+	const camera = pick(rng, [
+		// kjg-blikket: på ryggen under bilen, understellet fyller himmelen
+		lookFrom([liftX - lperp[0] * 900 + ldir[0] * 1600, 430, liftZ - lperp[1] * 900 + ldir[1] * 1600], [liftX + ldir[0] * 300, 2100, liftZ + ldir[1] * 300], 246),
+		// frå benken: over golvet mot løftebukken
+		lookFrom([wbx + 700, 1640, wbz - 800], [liftX, 1700, liftZ], 228),
+		// hukande ved dekkstabelen
+		lookFrom([-2500, 980, r(rng, 0, 1600)], [liftX + 800, 1900, liftZ], 236),
+		// bak golvbilen, i panserhøgd
+		lookFrom([gcx - gdir[0] * 3400, 1150, gcz - gdir[1] * 3400], [gcx + gdir[0] * 1900, 1250, gcz + gdir[1] * 1900], 234)
+	]);
+	return { boxes, camera };
+}
+
+// --- festsal: langbord med gjester på begge sider, dekketøy, hovudbord på pall, kelnarar ---
+function festsal(rng: Rng): Preset {
+	const boxes: Box[] = [];
+	const tblL = r(rng, 7000, 8600);
+	const gap = r(rng, 3600, 4200);
+	const headZ = -tblL / 2 - r(rng, 2400, 3000);
+	for (let tI = 0; tI < 2; tI++) {
+		const tx = (tI - 0.5) * gap;
+		boxes.push(bx(tx, 0, 0, 1050, 760, tblL, r(rng, -0.02, 0.02)));
+		const per = ri(rng, 5, 6);
+		for (const side of [-1, 1]) {
+			for (let i = 0; i < per; i++) {
+				if (rng() < 0.15) continue; // tom stol
+				const gz = -tblL / 2 + 900 + i * ((tblL - 1800) / (per - 1)) + r(rng, -150, 150);
+				const gx = tx + side * 900;
+				const facing = side < 0 ? Math.PI / 2 : -Math.PI / 2;
+				boxes.push(bx(gx, 0, gz, 430, 460, 430, facing));
+				const guest = person(rng, gx - side * 60, gz, facing + r(rng, -0.25, 0.25), 'sitgolv');
+				guest.min[1] = 460;
+				boxes.push(guest);
+			}
+		}
+		for (let i = 0; i < ri(rng, 4, 6); i++) {
+			const iz = r(rng, -tblL / 2 + 500, tblL / 2 - 500);
+			const kind = rng();
+			if (kind < 0.4) boxes.push(bx(tx + r(rng, -280, 280), 760, iz, 260, 45, 260, r(rng, 0, 1))); // fat
+			else if (kind < 0.75) boxes.push(bx(tx + r(rng, -260, 260), 760, iz, 90, r(rng, 240, 320), 90)); // flaske
+			else boxes.push(bx(tx + r(rng, -220, 220), 760, iz, 320, r(rng, 200, 280), 320, r(rng, 0, 1))); // terrin
+		}
+	}
+	// hovudbord på pall, på tvers
+	boxes.push(bx(0, 0, headZ, gap + 3200, 300, 2200));
+	boxes.push(bx(0, 300, headZ, 3800, 760, 1050, r(rng, -0.02, 0.02)));
+	for (let i = 0; i < 3; i++) {
+		const hx = (i - 1) * 1250 + r(rng, -150, 150);
+		boxes.push(bx(hx, 300, headZ - 850, 430, 460, 430, 0));
+		const hg = person(rng, hx, headZ - 850, r(rng, -0.2, 0.2), 'sitgolv');
+		hg.min[1] = 760;
+		boxes.push(hg);
+	}
+	for (const s of [-1, 1]) boxes.push(bx(s * r(rng, 900, 1400), 1060, headZ, 110, r(rng, 260, 380), 110)); // kandelaber
+	// kelnarar: gåande i midtgangen + bøygd skjenkjande ved ytterkanten
+	boxes.push(person(rng, r(rng, -400, 400), r(rng, -tblL / 2 + 1000, tblL / 2 - 500), (rng() < 0.5 ? 0 : Math.PI) + r(rng, -0.25, 0.25), 'gaande'));
+	boxes.push(person(rng, -gap / 2 - 1600, r(rng, -tblL / 4, tblL / 4), Math.PI / 2, 'boygd'));
+	// golvkandelaber i midtgangen: høge, tynne lysstakar
+	for (const cz of [-tblL / 4, tblL / 4]) {
+		const cx = r(rng, -500, 500);
+		boxes.push(bx(cx, 0, cz, 180, 2500, 180));
+		boxes.push(bx(cx, 2500, cz, 620, 220, 620, r(rng, 0, 0.6)));
+	}
+	const camera = pick(rng, [
+		// gjesteblikk: i enden av stolrekkja — sidemannen tett på, rada konvergerer
+		lookFrom([-gap / 2 - 900, 1240, tblL / 2 + 350], [-gap / 2 + 300, 850, -tblL / 2 - 800], 232),
+		// kelnarens gang: midt mellom borda, mot hovudbordet
+		lookFrom([r(rng, -300, 300), 1660, tblL / 2 + r(rng, 200, 800)], [0, 1000, headZ], 230),
+		// frå hovudbordet: utover salen
+		lookFrom([0, 1900, headZ - 300], [0, 900, tblL / 2], 232),
+		// froskeblikk i midtgangen: bordkantar og gjester tårnar
+		lookFrom([r(rng, -250, 250), 460, r(rng, -800, 800)], [-gap / 2, 1500, -tblL / 2 + 1500], 242)
+	]);
+	return { boxes, camera };
+}
+
 const GENERATORS: Record<PresetName, (rng: Rng) => Preset> = {
 	folkemengd,
 	klasserom,
@@ -1356,7 +1865,13 @@ const GENERATORS: Record<PresetName, (rng: Rng) => Preset> = {
 	kjøkken,
 	kontor,
 	croquis,
-	matbar
+	matbar,
+	sirkus,
+	hamnekai,
+	leikeplass,
+	museum,
+	bilverkstad,
+	festsal
 };
 
 export function buildPreset(name: PresetName, rng: Rng): Preset {
@@ -1410,7 +1925,7 @@ export function scorePreset(p: Preset, view = { w: 1200, h: 800 }): number {
 }
 
 // trekk om att til komposisjonen står seg; behald beste forsøket som fallback
-export function buildGreatPreset(name: PresetName, rng: Rng, tries = 10): Preset {
+export function buildGreatPreset(name: PresetName, rng: Rng, tries = 12): Preset {
 	let best: Preset | null = null;
 	let bestScore = -1;
 	for (let i = 0; i < tries; i++) {
