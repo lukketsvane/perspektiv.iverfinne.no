@@ -233,6 +233,8 @@ budsjett: sampler + teikning < 6 ms/frame ved 200 boksar (m1 macbook / ipad pro)
 
 - **fem nye scener + detalj-pass** (v1.7, 18 presetar totalt): karavane (kamel/hest/struts bygde av boksar med ryttarar i salen, geiteflokk, gjetarar — demoarket), konsert (scenegolv, band, tromme-klynge, forsterkarar, lysrigg med kastarar, publikum i bogar, barn på skuldrene), perrong (togvegg, søylerekkje med tak, benker, ventande med kofferter), kjøkken (benkerekkjer med gryter, avtrekkshetter, bøygde kokkar), kontor (pultøyar med skjermar og sitjande, skiljeveggar, møtebord, planter, tavle). detalj-pass på eksisterande: verktøy på verkstadbenkene, bøker/sekkar i klasserommet, markiser og skilt i gata. alle med 3 komponerte synspunkt og dekte av kvalitets- og høgdevaktene.
 
+- **croquis og matbar** (v1.8, 20 presetar): croquis-salen (modell på podium med stol og parasoll, to bogar av staffeli — fremre sit på krakkar, bakre står — sekkar på golvet, og fire blikk inkl. MODELLENS attende på klassen og froskeblikk ved podiumkanten); matbaren (trong osaka-gate: diskar med flasker/fat/kanner, veggh hyller, hengjande skilt, gjester lenande og på krakkar på begge sider, kokk bak disken, sekk på golvet; gate-, disk- og kokkeblikk). verkstaden fekk papirbunker og benkelampar frå fabrikk-arket.
+
 ## 11. opne val
 
 1. stakken i repoet: går ut frå sveltekit + ts + vitest + pnpm; stemmer det?
