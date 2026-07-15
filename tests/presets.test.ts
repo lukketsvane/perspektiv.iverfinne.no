@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { buildPreset, PRESET_NAMES, randomPresetName } from '../src/lib/perspective/presets';
+import {
+	buildGreatPreset,
+	buildPreset,
+	PRESET_NAMES,
+	PRESET_SCORE_MIN,
+	randomPresetName,
+	scorePreset
+} from '../src/lib/perspective/presets';
 import { EYE_MAX, EYE_MIN } from '../src/lib/perspective/camera';
 import { makeHistory, pushCmd, redo, undo } from '../src/lib/perspective/history';
 import { cloneBox, defaultDoc } from '../src/lib/perspective/scene';
@@ -65,6 +72,43 @@ describe('presetar', () => {
 		const seen = new Set<string>();
 		for (let i = 0; i < 300; i++) seen.add(randomPresetName(r));
 		expect(seen.size).toBe(PRESET_NAMES.length);
+	});
+
+	it('kvalitetsvakta: KVAR lasting av KVAR preset er eit sterkt startpunkt', () => {
+		// dette er garantien bak t-tasten: 13 presetar × 30 seed, alle over golvet
+		for (const name of PRESET_NAMES) {
+			for (let seed = 1; seed <= 30; seed++) {
+				const p = buildGreatPreset(name, rng(seed * 7 + 1));
+				const s = scorePreset(p);
+				expect(s, `${name} seed ${seed} skåra ${s.toFixed(2)}`).toBeGreaterThanOrEqual(
+					PRESET_SCORE_MIN
+				);
+			}
+		}
+	});
+
+	it('skåren straffar det som gjer eit startpunkt dårleg', () => {
+		// tom scene
+		expect(
+			scorePreset({ boxes: [], camera: { pos: [0, 1780, 0], yaw: 0, pitch: 0, fov: 3.8, proj: 'stereo' } })
+		).toBe(0);
+		// kamera inne i ein boks → hard null
+		const p = buildPreset('folkemengd', rng(4));
+		const inside = {
+			...p,
+			camera: {
+				...p.camera,
+				pos: [
+					p.boxes[0].min[0] + p.boxes[0].size[0] / 2,
+					p.boxes[0].min[1] + p.boxes[0].size[1] / 2,
+					p.boxes[0].min[2] + p.boxes[0].size[2] / 2
+				] as [number, number, number]
+			}
+		};
+		expect(scorePreset(inside)).toBe(0);
+		// kamera vendt BORT frå scena → langt under godkjent
+		const away = { ...p, camera: { ...p.camera, pos: [0, 1780, 60000] as [number, number, number] } };
+		expect(scorePreset(away)).toBeLessThan(PRESET_SCORE_MIN);
 	});
 
 	it('scene-kommandoen i historikken angrar preset-lasting som eitt steg', () => {

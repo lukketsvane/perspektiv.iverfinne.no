@@ -24,7 +24,7 @@ import { parseDoc } from '../perspective/io';
 import { docToSvg } from '../perspective/svg';
 import { FOV_LIMITS, clampCamera } from '../perspective/camera';
 import {
-	buildPreset,
+	buildGreatPreset,
 	PRESET_NAMES,
 	randomPresetName,
 	type PresetName
@@ -662,7 +662,7 @@ export function applyAction(ui: Ui, a: Action): void {
 				a.name && (PRESET_NAMES as string[]).includes(a.name)
 					? (a.name as PresetName)
 					: randomPresetName(Math.random);
-			const preset = buildPreset(name, Math.random);
+			const preset = buildGreatPreset(name, Math.random);
 			pushCmd(ui.history, {
 				kind: 'scene',
 				before: ui.doc.boxes.map((b) => cloneBox(b, b.id)),

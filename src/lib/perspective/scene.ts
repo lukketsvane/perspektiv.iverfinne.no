@@ -173,6 +173,17 @@ export function rayBox(ray: Ray, b: Box): Hit | null {
 	return { box: b, t: tmin, point, normal, face };
 }
 
+// er punktet inne i boksen? (til kamera-i-boks-vakta for presetar)
+export function pointInBox(p: V3, b: Box): boolean {
+	const c = centroid(b);
+	const l = rotY(vsub(p, c), -b.yaw);
+	return (
+		Math.abs(l[0]) <= b.size[0] / 2 &&
+		Math.abs(l[1]) <= b.size[1] / 2 &&
+		Math.abs(l[2]) <= b.size[2] / 2
+	);
+}
+
 export function raycast(boxes: readonly Box[], ray: Ray): Hit | null {
 	let best: Hit | null = null;
 	for (const b of boxes) {
