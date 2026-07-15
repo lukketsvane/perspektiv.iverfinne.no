@@ -104,37 +104,40 @@
 			{/each}
 		</div>
 		<div class="sep"></div>
-		{#each GRID_KEYS as [key, label] (key)}
+		<div class="grid2">
+			{#each GRID_KEYS as [key, label] (key)}
+				<button
+					class="row toggle"
+					class:on={snap[key as keyof typeof snap] === true}
+					onpointerdown={() => toggle(key, !(snap[key as keyof typeof snap] === true))}
+				>
+					<span class="dot"></span>{label}
+				</button>
+			{/each}
+			<button class="row toggle" class:on={snap.jitter} onpointerdown={() => toggle('jitter', !snap.jitter)}>
+				<span class="dot"></span>jitter
+			</button>
+			<button class="row toggle" class:on={snap.moduleTicks} onpointerdown={() => toggle('moduleTicks', !snap.moduleTicks)}>
+				<span class="dot"></span>modul h/8
+			</button>
+			<button class="row toggle" class:on={snap.maskFaces} onpointerdown={() => toggle('maskFaces', !snap.maskFaces)}>
+				<span class="dot"></span>maska flater
+			</button>
 			<button
 				class="row toggle"
-				class:on={snap[key as keyof typeof snap] === true}
-				onpointerdown={() => toggle(key, !(snap[key as keyof typeof snap] === true))}
+				class:on={snap.fit === 'cover'}
+				onpointerdown={() => act({ t: 'settings-patch', patch: { fit: snap.fit === 'cover' ? 'inscribe' : 'cover' } })}
 			>
-				<span class="dot"></span>{label}
+				<span class="dot"></span>cover
 			</button>
-		{/each}
-		<div class="sep"></div>
-		<button class="row toggle" class:on={snap.jitter} onpointerdown={() => toggle('jitter', !snap.jitter)}>
-			<span class="dot"></span>jitter
-		</button>
-		<button class="row toggle" class:on={snap.moduleTicks} onpointerdown={() => toggle('moduleTicks', !snap.moduleTicks)}>
-			<span class="dot"></span>modul-merke (h/8)
-		</button>
-		<button class="row toggle" class:on={snap.maskFaces} onpointerdown={() => toggle('maskFaces', !snap.maskFaces)}>
-			<span class="dot"></span>kvitmaska flater
-		</button>
-		<button
-			class="row toggle"
-			class:on={snap.fit === 'cover'}
-			onpointerdown={() => act({ t: 'settings-patch', patch: { fit: snap.fit === 'cover' ? 'inscribe' : 'cover' } })}
-		>
-			<span class="dot"></span>cover-modus
-		</button>
+		</div>
 		<div class="sep"></div>
 		<button class="row" onpointerdown={() => act({ t: 'preset-load', name: null })}>tilfeldig preset</button>
-		{#each PRESET_NAMES as p (p)}
-			<button class="row preset" onpointerdown={() => act({ t: 'preset-load', name: p })}>· {p}</button>
-		{/each}
+		<div class="grid2">
+			{#each PRESET_NAMES as p (p)}
+				<button class="row preset" onpointerdown={() => act({ t: 'preset-load', name: p })}>{p}</button>
+			{/each}
+		</div>
 		<div class="sep"></div>
 		<button class="row" onpointerdown={() => { act({ t: 'export-svg' }); onclose(); }}>eksporter svg</button>
 		<button class="row" onpointerdown={() => { act({ t: 'export-json' }); onclose(); }}>eksporter json</button>
@@ -151,20 +154,27 @@
 	}
 	.sheet {
 		position: fixed;
-		width: 220px;
+		width: 216px;
+		max-height: min(72vh, 560px);
+		overflow-y: auto;
 		background: var(--fp-paper, #f7f4ee);
 		border: 1px solid color-mix(in srgb, var(--fp-ink, #1a1a1c) 55%, transparent);
 		border-radius: 3px;
 		box-shadow: 2px 3px 0 color-mix(in srgb, var(--fp-ink, #1a1a1c) 12%, transparent);
 		padding: 6px;
 		font:
-			500 12px ui-monospace,
+			500 11px ui-monospace,
 			SFMono-Regular,
 			Menlo,
 			monospace;
 		color: var(--fp-ink, #1a1a1c);
 		user-select: none;
 		animation: inn 0.14s ease;
+	}
+	.grid2 {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0 4px;
 	}
 	@keyframes inn {
 		from {
@@ -179,9 +189,9 @@
 	.row {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 6px;
 		width: 100%;
-		padding: 7px 8px;
+		padding: 5px 6px;
 		background: none;
 		border: none;
 		font: inherit;
@@ -204,7 +214,7 @@
 		background: none;
 		border: 1px solid color-mix(in srgb, var(--fp-ink, #1a1a1c) 35%, transparent);
 		border-radius: 2px;
-		padding: 5px 0;
+		padding: 4px 0;
 		color: inherit;
 		cursor: pointer;
 	}
@@ -213,8 +223,8 @@
 		color: var(--fp-blue, #1155cc);
 	}
 	.preset {
-		padding-top: 4px;
-		padding-bottom: 4px;
+		padding-top: 3px;
+		padding-bottom: 3px;
 		opacity: 0.85;
 	}
 	.toggle .dot {

@@ -26,9 +26,27 @@ describe('io (json inn/ut)', () => {
 		expect(s.locked).toBe(false);
 	});
 
+	it('v1-dokument migrerer fit → cover; v2 beheld valet', () => {
+		const legacy = JSON.stringify({
+			version: 1,
+			boxes: [{ id: 'a', min: [0, 0, 0], size: [500, 500, 500], yaw: 0 }],
+			camera: { pos: [0, 1780, 0] },
+			settings: { fit: 'inscribe', theme: 'dark' }
+		});
+		const doc = parseDoc(legacy);
+		expect(doc).not.toBeNull();
+		expect(doc!.version).toBe(2);
+		expect(doc!.settings.fit).toBe('cover'); // gammal default vart migrert
+		expect(doc!.settings.theme).toBe('dark'); // aktive val overlever
+		expect(doc!.boxes.length).toBe(1);
+
+		const kept = parseDoc(JSON.stringify({ version: 2, settings: { fit: 'inscribe' } }));
+		expect(kept!.settings.fit).toBe('inscribe'); // v2: inscribe er eit medvite val
+	});
+
 	it('avviser feil versjon og ugyldig json; sanerer boksar', () => {
 		expect(parseDoc('ikkje json')).toBeNull();
-		expect(parseDoc(JSON.stringify({ version: 2 }))).toBeNull();
+		expect(parseDoc(JSON.stringify({ version: 3 }))).toBeNull();
 		const messy = JSON.stringify({
 			version: 1,
 			boxes: [

@@ -77,16 +77,16 @@
 <style>
 	.bar {
 		position: fixed;
-		top: max(12px, env(safe-area-inset-top));
-		right: max(12px, env(safe-area-inset-right));
+		top: max(10px, env(safe-area-inset-top));
+		right: max(10px, env(safe-area-inset-right));
 		display: flex;
 		flex-direction: column;
-		gap: 6px;
+		gap: 4px;
 		z-index: 10;
 	}
 	.knapp {
-		width: 32px;
-		height: 32px;
+		width: 26px;
+		height: 26px;
 		display: grid;
 		place-items: center;
 		padding: 0;
@@ -94,7 +94,7 @@
 		border: 1px solid color-mix(in srgb, var(--fp-ink, #1a1a1c) 40%, transparent);
 		background: color-mix(in srgb, var(--fp-paper, #f7f4ee) 72%, transparent);
 		color: var(--fp-ink, #1a1a1c);
-		opacity: 0.45;
+		opacity: 0.35;
 		cursor: pointer;
 		transition:
 			opacity 0.15s ease,
@@ -111,12 +111,18 @@
 		border-color: var(--fp-blue, #1155cc);
 	}
 	.knapp.daud {
-		opacity: 0.18;
+		opacity: 0.15;
 		cursor: default;
 	}
+	/* touch har ikkje hover: hald knappane lesbare, men diskrete */
+	@media (pointer: coarse) {
+		.knapp {
+			opacity: 0.55;
+		}
+	}
 	.knapp svg {
-		width: 16px;
-		height: 16px;
+		width: 13px;
+		height: 13px;
 		fill: none;
 		stroke: currentColor;
 		stroke-width: 1.4;
