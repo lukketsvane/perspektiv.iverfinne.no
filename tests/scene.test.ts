@@ -5,6 +5,7 @@ import {
 	boxEdges,
 	centroid,
 	figureBoxAt,
+	formatM,
 	makeBoxFromFootprint,
 	rayBox,
 	rayFloor,
@@ -160,6 +161,15 @@ describe('boks-ops', () => {
 		expect(snapMm(-76)).toBe(-100);
 		expect(snapYaw(14 * DEG)).toBeCloseTo(15 * DEG, 12);
 		expect(snapYaw(7 * DEG)).toBeCloseTo(0, 12);
+	});
+
+	it('formatM: mm internt, meter i grensesnittet', () => {
+		expect(formatM(1780)).toBe('1.78');
+		expect(formatM(300)).toBe('0.3');
+		expect(formatM(10000)).toBe('10');
+		expect(formatM(50)).toBe('0.05');
+		expect(formatM(12345)).toBe('12.3');
+		expect(formatM(0)).toBe('0');
 	});
 });
 
