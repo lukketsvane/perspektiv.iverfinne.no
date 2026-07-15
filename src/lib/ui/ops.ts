@@ -22,7 +22,13 @@ import { unproject, type Frame, type ProjName, type V3 } from '../perspective/pr
 import { makeHistory, pushCmd, redo as histRedo, undo as histUndo, type History } from '../perspective/history';
 import { parseDoc } from '../perspective/io';
 import { docToSvg } from '../perspective/svg';
-import { FOV_LIMITS } from '../perspective/camera';
+import { FOV_LIMITS, clampCamera } from '../perspective/camera';
+import {
+	buildPreset,
+	PRESET_NAMES,
+	randomPresetName,
+	type PresetName
+} from '../perspective/presets';
 import type { Action, NumericCtx } from './gestures';
 
 // aktiv boks-gest med før-tilstand for avbrot
@@ -614,6 +620,25 @@ export function applyAction(ui: Ui, a: Action): void {
 				cam.fov = Math.min(hi, Math.max(lo, cam.fov));
 				hudFov(ui);
 			}
+			break;
+		}
+		case 'preset-load': {
+			if (ui.gest || ui.ghost) return; // aldri midt i ein gest
+			const name: PresetName =
+				a.name && (PRESET_NAMES as string[]).includes(a.name)
+					? (a.name as PresetName)
+					: randomPresetName(Math.random);
+			const preset = buildPreset(name, Math.random);
+			pushCmd(ui.history, {
+				kind: 'scene',
+				before: ui.doc.boxes.map((b) => cloneBox(b, b.id)),
+				after: preset.boxes.map((b) => cloneBox(b, b.id))
+			});
+			ui.doc.boxes = preset.boxes;
+			ui.selection = null;
+			Object.assign(ui.doc.camera, preset.camera);
+			clampCamera(ui.doc.camera);
+			hud(ui, `preset: ${name} (${preset.boxes.length} boksar)`);
 			break;
 		}
 

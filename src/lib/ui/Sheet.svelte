@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Action } from './gestures';
 	import type { Doc } from '../perspective/scene';
+	import { PRESET_NAMES } from '../perspective/presets';
 
 	let {
 		open = false,
@@ -130,6 +131,11 @@
 			<span class="dot"></span>cover-modus
 		</button>
 		<div class="sep"></div>
+		<button class="row" onpointerdown={() => act({ t: 'preset-load', name: null })}>tilfeldig preset</button>
+		{#each PRESET_NAMES as p (p)}
+			<button class="row preset" onpointerdown={() => act({ t: 'preset-load', name: p })}>· {p}</button>
+		{/each}
+		<div class="sep"></div>
 		<button class="row" onpointerdown={() => { act({ t: 'export-svg' }); onclose(); }}>eksporter svg</button>
 		<button class="row" onpointerdown={() => { act({ t: 'export-json' }); onclose(); }}>eksporter json</button>
 		<button class="row" onpointerdown={() => fileInput?.click()}>importer json…</button>
@@ -205,6 +211,11 @@
 	.seg button.on {
 		border-color: #1155cc;
 		color: #1155cc;
+	}
+	.preset {
+		padding-top: 4px;
+		padding-bottom: 4px;
+		opacity: 0.85;
 	}
 	.toggle .dot {
 		width: 7px;

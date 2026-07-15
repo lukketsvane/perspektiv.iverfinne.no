@@ -5,7 +5,9 @@ import { cloneBox, type Box, type Doc } from './scene';
 export type Command =
 	| { kind: 'add'; box: Box }
 	| { kind: 'delete'; box: Box; index: number }
-	| { kind: 'update'; id: string; before: Box; after: Box };
+	| { kind: 'update'; id: string; before: Box; after: Box }
+	// heil-scene-byte (preset-lasting): angrast som eitt steg
+	| { kind: 'scene'; before: Box[]; after: Box[] };
 
 export type History = { undoStack: Command[]; redoStack: Command[]; limit: number };
 
@@ -37,6 +39,9 @@ function applyForward(doc: Doc, cmd: Command): void {
 			}
 			break;
 		}
+		case 'scene':
+			doc.boxes = cmd.after.map((b) => cloneBox(b, b.id));
+			break;
 	}
 }
 
@@ -59,6 +64,9 @@ function applyBackward(doc: Doc, cmd: Command): void {
 			}
 			break;
 		}
+		case 'scene':
+			doc.boxes = cmd.before.map((b) => cloneBox(b, b.id));
+			break;
 	}
 }
 
