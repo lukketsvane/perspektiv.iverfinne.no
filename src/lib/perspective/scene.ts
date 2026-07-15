@@ -21,7 +21,8 @@ export type Settings = {
 	locked: boolean; // referanselås: ingen redigering/kamera før opplåsing
 };
 
-export type Doc = { version: 1; boxes: Box[]; camera: CameraState; settings: Settings };
+// versjon 2: cover vart default (v1-lagringar migrerer fit → cover ved lasting)
+export type Doc = { version: 2; boxes: Box[]; camera: CameraState; settings: Settings };
 
 export function defaultSettings(): Settings {
 	return {
@@ -41,7 +42,7 @@ export function defaultSettings(): Settings {
 }
 
 export function defaultDoc(): Doc {
-	return { version: 1, boxes: [], camera: defaultCamera(), settings: defaultSettings() };
+	return { version: 2, boxes: [], camera: defaultCamera(), settings: defaultSettings() };
 }
 export type Face = 'top' | 'bottom' | 'side';
 export type Hit = { box: Box; t: number; point: V3; normal: V3; face: Face };

@@ -222,6 +222,9 @@ budsjett: sampler + teikning < 6 ms/frame ved 200 boksar (m1 macbook / ipad pro)
 - **scene-presetar med randomisering**: `presets.ts` med seks generatorar i menneskeskala — folkemengd, klasserom, verkstad, stall (hestar av boksar), hovudstudie (boksa hovud på soklar), figurrekkje. `t` lastar tilfeldig preset; arket listar alle. lastinga er eitt angre-steg (scene-kommando i history).
 - **cover som default**: papiret dekkjer heile skjermen; innskriven fiskeaugesirkel er valet (`c` / arket).
 - **verktøylinje** (mjukna ui-laust-krav, vedteke av brukaren): tre diskrete knappar oppe til høgre — referanselås (`l`; blokkerer all redigering og kamerarørsle når vindauget er teiknereferanse), inverter/mørk modus (`i`; papir↔blekk, persistert), og innstillingsarket (som elles ligg på to-finger long-press).
+- **pose-drivne bounding boxes** (v1.3): figurboksane i presetane er tette kring posituren slik kjg teiknar dei — ståande/gåande/lenande/hukande/sitjande/bøygd med sterkt varierte proporsjonar; hundar og hestar som kropp+hovud(+bein). folkemengda er straumar/køar med følgjesvenar, samtalepar og kasse-sitjarar.
+- **ni presetar med designa synspunkt** (v1.3): + gate (stup frå takhøgd ned i husskaret, à la buss-arket), teiknekveld (publikumsring kring golvlerret) og interiør (rom med veggar og innreiing). kvar preset har 2–3 komponerte synspunkt (augehøgd, fov, sikteanker i boksane) som randomiseringa vel mellom.
+- **dokumentversjon 2** (v1.3): v1-lagringar migrerer `fit` → cover ved lasting (gamal default skal ikkje overstyre ny); aktive val elles overlever. kompaktare ark (to kolonnar, rulletak) og mindre verktøylinjeknappar.
 
 ## 11. opne val
 

@@ -45,7 +45,9 @@ export function parseDoc(json: string): Doc | null {
 	}
 	if (typeof raw !== 'object' || raw === null) return null;
 	const o = raw as Record<string, unknown>;
-	if (o.version !== 1) return null;
+	if (o.version !== 1 && o.version !== 2) return null;
+	// v1-dokument er frå før cover vart default; fit der var ikkje eit aktivt val
+	const legacy = o.version === 1;
 
 	const base = defaultDoc();
 	const boxes: Box[] = [];
@@ -86,7 +88,9 @@ export function parseDoc(json: string): Doc | null {
 		}
 	}
 
-	return { version: 1, boxes, camera: base.camera, settings };
+	if (legacy) settings.fit = 'cover'; // migrasjon: ny default vinn over gammal default
+
+	return { version: 2, boxes, camera: base.camera, settings };
 }
 
 export function saveLocal(doc: Doc): void {
