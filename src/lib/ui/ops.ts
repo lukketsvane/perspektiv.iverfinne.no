@@ -3,9 +3,9 @@
 
 import { cycleProj, look, orbit, setEye, setFov, walk } from '../perspective/camera';
 import {
+	boxCorners,
 	centroid,
 	cloneBox,
-	figureBoxAt,
 	formatM,
 	makeBoxFromFootprint,
 	newId,
@@ -18,7 +18,12 @@ import {
 	type Ray,
 	type Settings
 } from '../perspective/scene';
-import { unproject, type Frame, type ProjName, type V3 } from '../perspective/projection';
+import {
+	buildMannequin,
+	nextMannequinPose,
+	parseMannequinGrp
+} from '../perspective/mannequin';
+import { rotY, unproject, type Frame, type ProjName, type V3 } from '../perspective/projection';
 import { makeHistory, pushCmd, redo as histRedo, undo as histUndo, type History } from '../perspective/history';
 import { parseDoc } from '../perspective/io';
 import { docToSvg } from '../perspective/svg';
@@ -31,13 +36,13 @@ import {
 } from '../perspective/presets';
 import type { Action, NumericCtx } from './gestures';
 
-// aktiv boks-gest med før-tilstand for avbrot
+// aktiv boks-gest med før-tilstand for avbrot; grpBackups når gesten gjeld ei heil gruppe
 type Gest =
 	| { kind: 'draw'; a: [number, number]; baseY: number }
-	| { kind: 'move'; id: string; backup: Box; offX: number; offZ: number; added: boolean }
+	| { kind: 'move'; id: string; backup: Box; offX: number; offZ: number; added: boolean; grpBackups?: Box[] }
 	| { kind: 'push'; id: string; backup: Box; hGrab: number }
 	| { kind: 'vmove'; id: string; backup: Box; yGrab: number }
-	| { kind: 'rotate'; id: string; backup: Box; acc: number }
+	| { kind: 'rotate'; id: string; backup: Box; acc: number; grpBackups?: Box[] }
 	| null;
 
 export type Ui = {
@@ -115,8 +120,16 @@ function boxesEqual(a: Box, b: Box): boolean {
 		a.size[0] === b.size[0] &&
 		a.size[1] === b.size[1] &&
 		a.size[2] === b.size[2] &&
-		a.yaw === b.yaw
+		a.yaw === b.yaw &&
+		(a.pitch ?? 0) === (b.pitch ?? 0) &&
+		(a.grp ?? '') === (b.grp ?? '')
 	);
+}
+
+// alle boksane i same gruppe som b (b sjølv inkludert), i dokumentrekkjefylgje
+function groupOf(ui: Ui, b: Box): Box[] {
+	if (!b.grp) return [b];
+	return ui.doc.boxes.filter((x) => x.grp === b.grp);
 }
 
 // avslutt aktiv boks-gest og registrer kommandoen i historikken
@@ -126,8 +139,24 @@ function commitGest(ui: Ui): void {
 	if (!g || g.kind === 'draw') return;
 	const b = boxById(ui, g.id);
 	if (!b) return;
+	const grpBackups = (g.kind === 'move' || g.kind === 'rotate') && g.grpBackups;
 	if (g.kind === 'move' && g.added) {
-		pushCmd(ui.history, { kind: 'add', box: cloneBox(b, b.id) });
+		const added = groupOf(ui, b);
+		pushCmd(
+			ui.history,
+			added.length > 1
+				? { kind: 'batch', cmds: added.map((x) => ({ kind: 'add' as const, box: cloneBox(x, x.id) })) }
+				: { kind: 'add', box: cloneBox(b, b.id) }
+		);
+	} else if (grpBackups && grpBackups.length > 1) {
+		const cmds = [];
+		for (const bk of grpBackups) {
+			const cur = boxById(ui, bk.id);
+			if (cur && !boxesEqual(bk, cur)) {
+				cmds.push({ kind: 'update' as const, id: cur.id, before: cloneBox(bk, bk.id), after: cloneBox(cur, cur.id) });
+			}
+		}
+		if (cmds.length) pushCmd(ui.history, { kind: 'batch', cmds });
 	} else if (!boxesEqual(g.backup, b)) {
 		pushCmd(ui.history, {
 			kind: 'update',
@@ -152,6 +181,21 @@ function recordUpdate(ui: Ui, before: Box, b: Box): void {
 function deleteBoxById(ui: Ui, id: string): void {
 	const i = ui.doc.boxes.findIndex((b) => b.id === id);
 	if (i < 0) return;
+	const grp = ui.doc.boxes[i].grp;
+	if (grp) {
+		// slett heile gruppa (mannekeng) som eitt angre-steg; kommandoar i fallande
+		// indeks-rekkjefylgje → batch-undo (omvend iterasjon) set inn att stigande = eksakt
+		const cmds = [];
+		for (let k = ui.doc.boxes.length - 1; k >= 0; k--) {
+			if (ui.doc.boxes[k].grp === grp) {
+				cmds.push({ kind: 'delete' as const, box: cloneBox(ui.doc.boxes[k], ui.doc.boxes[k].id), index: k });
+			}
+		}
+		pushCmd(ui.history, { kind: 'batch', cmds });
+		ui.doc.boxes = ui.doc.boxes.filter((b) => b.grp !== grp);
+		if (ui.selection && !ui.doc.boxes.some((b) => b.id === ui.selection)) ui.selection = null;
+		return;
+	}
 	pushCmd(ui.history, { kind: 'delete', box: cloneBox(ui.doc.boxes[i], id), index: i });
 	ui.doc.boxes.splice(i, 1);
 	if (ui.selection === id) ui.selection = null;
@@ -234,6 +278,8 @@ function restoreBackup(ui: Ui, id: string, backup: Box): void {
 	b.min = [...backup.min];
 	b.size = [...backup.size];
 	b.yaw = backup.yaw;
+	if (backup.pitch) b.pitch = backup.pitch;
+	else delete b.pitch;
 }
 
 function hudBoxPos(ui: Ui, b: Box) {
@@ -422,8 +468,24 @@ export function applyAction(ui: Ui, a: Action): void {
 			let target = src;
 			let added = false;
 			if (a.duplicate) {
-				target = cloneBox(src);
-				ui.doc.boxes.push(target);
+				if (src.grp) {
+					// dupliser heile gruppa med ny gruppe-identitet; grip tilsvarande del
+					const members = groupOf(ui, src);
+					const uid = newId();
+					const parsed = parseMannequinGrp(src.grp);
+					const newGrp = parsed ? `mq:${parsed.pose}:${parsed.height}:${uid}` : `${src.grp}~${uid}`;
+					let grabbed: Box | null = null;
+					for (const m of members) {
+						const c = cloneBox(m);
+						c.grp = newGrp;
+						ui.doc.boxes.push(c);
+						if (m.id === src.id) grabbed = c;
+					}
+					target = grabbed ?? src;
+				} else {
+					target = cloneBox(src);
+					ui.doc.boxes.push(target);
+				}
 				added = true;
 			}
 			ui.selection = target.id;
@@ -435,7 +497,8 @@ export function applyAction(ui: Ui, a: Action): void {
 				backup: cloneBox(target, target.id),
 				offX: target.min[0] - anchor[0],
 				offZ: target.min[2] - anchor[2],
-				added
+				added,
+				grpBackups: target.grp ? groupOf(ui, target).map((m) => cloneBox(m, m.id)) : undefined
 			};
 			break;
 		}
@@ -445,8 +508,22 @@ export function applyAction(ui: Ui, a: Action): void {
 			if (!b) return;
 			const anchor = planePointAt(ui, a.x, a.y, b.min[1]);
 			if (!anchor) return;
-			b.min[0] = snapMm(anchor[0] + ui.gest.offX);
-			b.min[2] = snapMm(anchor[2] + ui.gest.offZ);
+			const nx = snapMm(anchor[0] + ui.gest.offX);
+			const nz = snapMm(anchor[2] + ui.gest.offZ);
+			if (ui.gest.grpBackups) {
+				// flytt heile gruppa med same delta (frå backup-posisjonane)
+				const dx = nx - ui.gest.backup.min[0];
+				const dz = nz - ui.gest.backup.min[2];
+				for (const bk of ui.gest.grpBackups) {
+					const m = boxById(ui, bk.id);
+					if (!m) continue;
+					m.min[0] = bk.min[0] + dx;
+					m.min[2] = bk.min[2] + dz;
+				}
+			} else {
+				b.min[0] = nx;
+				b.min[2] = nz;
+			}
 			hudBoxPos(ui, b);
 			break;
 		}
@@ -525,7 +602,13 @@ export function applyAction(ui: Ui, a: Action): void {
 			const b = a.id ? boxById(ui, a.id) : selectedBox(ui);
 			if (!b) return;
 			ui.selection = b.id;
-			ui.gest = { kind: 'rotate', id: b.id, backup: cloneBox(b, b.id), acc: 0 };
+			ui.gest = {
+				kind: 'rotate',
+				id: b.id,
+				backup: cloneBox(b, b.id),
+				acc: 0,
+				grpBackups: b.grp ? groupOf(ui, b).map((m) => cloneBox(m, m.id)) : undefined
+			};
 			hud(ui, `${Math.round((b.yaw * 180) / Math.PI)}°`);
 			break;
 		}
@@ -534,9 +617,35 @@ export function applyAction(ui: Ui, a: Action): void {
 			const b = boxById(ui, ui.gest.id);
 			if (!b) return;
 			ui.gest.acc += a.ddeg;
-			const raw = ui.gest.backup.yaw + (ui.gest.acc * Math.PI) / 180;
-			b.yaw = a.free ? raw : snapYaw(raw);
-			hud(ui, `${Math.round((b.yaw * 180) / Math.PI)}°`);
+			if (ui.gest.grpBackups) {
+				// rotér gruppa som stiv kropp kring sentroiden (snapp på DELTA)
+				const rawD = (ui.gest.acc * Math.PI) / 180;
+				const d = a.free ? rawD : snapYaw(rawD);
+				const bks = ui.gest.grpBackups;
+				let px = 0;
+				let pz = 0;
+				for (const bk of bks) {
+					px += bk.min[0] + bk.size[0] / 2;
+					pz += bk.min[2] + bk.size[2] / 2;
+				}
+				px /= bks.length;
+				pz /= bks.length;
+				for (const bk of bks) {
+					const m = boxById(ui, bk.id);
+					if (!m) continue;
+					const cx = bk.min[0] + bk.size[0] / 2 - px;
+					const cz = bk.min[2] + bk.size[2] / 2 - pz;
+					const rc = rotY([cx, 0, cz], d);
+					m.min[0] = px + rc[0] - bk.size[0] / 2;
+					m.min[2] = pz + rc[2] - bk.size[2] / 2;
+					m.yaw = bk.yaw + d;
+				}
+				hud(ui, `${Math.round((d * 180) / Math.PI)}°`);
+			} else {
+				const raw = ui.gest.backup.yaw + (ui.gest.acc * Math.PI) / 180;
+				b.yaw = a.free ? raw : snapYaw(raw);
+				hud(ui, `${Math.round((b.yaw * 180) / Math.PI)}°`);
+			}
 			break;
 		}
 		case 'rotate-set': {
@@ -550,15 +659,69 @@ export function applyAction(ui: Ui, a: Action): void {
 			break;
 		}
 
-		// ---- stempel / slett / nudge (M4) ----
+		// ---- stempel / slett / nudge (M4; mannekeng v2.1) ----
 		case 'figure-stamp': {
-			const p = planePointAt(ui, a.x, a.y, 0);
+			// negativ koordinat = «midt i synsfeltet» (f-tasten utan peikar)
+			const sx = a.x < 0 && f ? f.w / 2 : a.x;
+			const sy = a.y < 0 && f ? f.h * 0.62 : a.y;
+			const p = planePointAt(ui, sx, sy, 0);
 			if (!p) return;
-			const fb = figureBoxAt(newId(), snapMm(p[0]), snapMm(p[2]), 0, cam.pos);
-			ui.doc.boxes.push(fb);
-			ui.selection = fb.id;
-			pushCmd(ui.history, { kind: 'add', box: cloneBox(fb, fb.id) });
-			hud(ui, 'figurboks 0.5 × 1.75 × 0.3 m');
+			const yawC = Math.atan2(cam.pos[0] - p[0], cam.pos[2] - p[2]);
+			const parts = buildMannequin({
+				x: snapMm(p[0]),
+				z: snapMm(p[2]),
+				yaw: yawC,
+				height: 1750,
+				pose: 'staande'
+			});
+			ui.doc.boxes.push(...parts);
+			ui.selection = parts[0].id;
+			pushCmd(ui.history, {
+				kind: 'batch',
+				cmds: parts.map((b) => ({ kind: 'add' as const, box: cloneBox(b, b.id) }))
+			});
+			hud(ui, 'mannekeng 1.75 m · f byter positur', 1600);
+			break;
+		}
+		case 'figure-key': {
+			const sel = selectedBox(ui);
+			const parsed = sel?.grp ? parseMannequinGrp(sel.grp) : null;
+			if (!sel || !parsed) {
+				// ingen mannekeng vald: stemple ein ny midt i synsfeltet
+				applyAction(ui, { t: 'figure-stamp', x: -1, y: -1 });
+				return;
+			}
+			if (ui.gest || ui.ghost) return;
+			const members = groupOf(ui, sel);
+			const pelvis = members[0];
+			const pose = nextMannequinPose(parsed.pose);
+			// anker: bekken-sentroid i xz, lågaste hjørne i gruppa som basisplan
+			const ax2 = pelvis.min[0] + pelvis.size[0] / 2;
+			const az2 = pelvis.min[2] + pelvis.size[2] / 2;
+			let baseY = Infinity;
+			for (const m of members) for (const c of boxCorners(m)) if (c[1] < baseY) baseY = c[1];
+			const parts = buildMannequin({
+				x: ax2,
+				z: az2,
+				yaw: pelvis.yaw,
+				height: parsed.height,
+				pose,
+				baseY: Math.max(0, baseY),
+				grpUid: parsed.uid
+			});
+			// byt ut gruppa som eitt angre-steg: slettingar (fallande indeks) + nye delar
+			const cmds = [];
+			for (let k = ui.doc.boxes.length - 1; k >= 0; k--) {
+				if (ui.doc.boxes[k].grp === sel.grp) {
+					cmds.push({ kind: 'delete' as const, box: cloneBox(ui.doc.boxes[k], ui.doc.boxes[k].id), index: k });
+				}
+			}
+			for (const b of parts) cmds.push({ kind: 'add' as const, box: cloneBox(b, b.id) });
+			pushCmd(ui.history, { kind: 'batch', cmds });
+			ui.doc.boxes = ui.doc.boxes.filter((b) => b.grp !== sel.grp);
+			ui.doc.boxes.push(...parts);
+			ui.selection = parts[0].id;
+			hud(ui, `positur: ${pose}`);
 			break;
 		}
 		case 'delete-selected': {
@@ -680,11 +843,17 @@ export function applyAction(ui: Ui, a: Action): void {
 		case 'cancel': {
 			if (ui.gest) {
 				const g = ui.gest;
+				const grpBackups = (g.kind === 'move' || g.kind === 'rotate') && g.grpBackups;
 				if (g.kind === 'move' && g.added) {
-					ui.doc.boxes = ui.doc.boxes.filter((b) => b.id !== g.id);
-					if (ui.selection === g.id) ui.selection = null;
+					const grabbed = boxById(ui, g.id);
+					const grp = grabbed?.grp;
+					ui.doc.boxes = grp
+						? ui.doc.boxes.filter((b) => b.grp !== grp)
+						: ui.doc.boxes.filter((b) => b.id !== g.id);
+					if (ui.selection && !ui.doc.boxes.some((b) => b.id === ui.selection)) ui.selection = null;
 				} else if (g.kind !== 'draw') {
-					restoreBackup(ui, g.id, g.backup);
+					if (grpBackups) for (const bk of grpBackups) restoreBackup(ui, bk.id, bk);
+					else restoreBackup(ui, g.id, g.backup);
 				}
 				ui.gest = null;
 			}

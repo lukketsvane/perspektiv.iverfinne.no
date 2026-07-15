@@ -27,12 +27,16 @@ function sanitizeBox(v: unknown, i: number): Box | null {
 	const o = v as Record<string, unknown>;
 	const size = vec3(o.size, [50, 50, 50]);
 	if (size[0] <= 0 || size[1] <= 0 || size[2] <= 0) return null;
-	return {
+	const b: Box = {
 		id: typeof o.id === 'string' && o.id !== '' ? o.id : `import${i}`,
 		min: vec3(o.min, [0, 0, 0]),
 		size,
 		yaw: num(o.yaw, 0)
 	};
+	const pitch = num(o.pitch, 0);
+	if (pitch !== 0) b.pitch = pitch;
+	if (typeof o.grp === 'string' && o.grp !== '') b.grp = o.grp;
+	return b;
 }
 
 // tolerant parsing: ukjende felt vert ignorerte, manglande fyller frå default
@@ -45,7 +49,7 @@ export function parseDoc(json: string): Doc | null {
 	}
 	if (typeof raw !== 'object' || raw === null) return null;
 	const o = raw as Record<string, unknown>;
-	if (o.version !== 1 && o.version !== 2) return null;
+	if (o.version !== 1 && o.version !== 2 && o.version !== 3) return null;
 	// v1-dokument er frå før cover vart default; fit der var ikkje eit aktivt val
 	const legacy = o.version === 1;
 
@@ -90,7 +94,7 @@ export function parseDoc(json: string): Doc | null {
 
 	if (legacy) settings.fit = 'cover'; // migrasjon: ny default vinn over gammal default
 
-	return { version: 2, boxes, camera: base.camera, settings };
+	return { version: 3, boxes, camera: base.camera, settings };
 }
 
 export function saveLocal(doc: Doc): void {

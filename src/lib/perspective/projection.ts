@@ -69,6 +69,13 @@ export function rotY(p: V3, a: number): V3 {
 	return [p[0] * c + p[2] * s, p[1], -p[0] * s + p[2] * c];
 }
 
+// rotasjon kring +x: rotX(α)·(0,1,0) = (0, cosα, sinα)
+export function rotX(p: V3, a: number): V3 {
+	const c = Math.cos(a);
+	const s = Math.sin(a);
+	return [p[0], p[1] * c - p[2] * s, p[1] * s + p[2] * c];
+}
+
 // ---- ramme ----
 
 const VIS_EPS = 1e-12;

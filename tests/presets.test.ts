@@ -9,7 +9,7 @@ import {
 } from '../src/lib/perspective/presets';
 import { EYE_MAX, EYE_MIN } from '../src/lib/perspective/camera';
 import { makeHistory, pushCmd, redo, undo } from '../src/lib/perspective/history';
-import { cloneBox, defaultDoc } from '../src/lib/perspective/scene';
+import { boxCorners, cloneBox, defaultDoc } from '../src/lib/perspective/scene';
 
 function rng(seed: number) {
 	let a = seed >>> 0;
@@ -36,7 +36,10 @@ describe('presetar', () => {
 					expect(b.size[0]).toBeGreaterThan(0);
 					expect(b.size[1]).toBeGreaterThan(0);
 					expect(b.size[2]).toBeGreaterThan(0);
-					expect(b.min[1]).toBeGreaterThanOrEqual(0); // ingenting under golvet
+					// ingenting under golvet: for pitcha boksar er det HJØRNA som tel
+					let lowest = Infinity;
+					for (const c of boxCorners(b)) if (c[1] < lowest) lowest = c[1];
+					expect(lowest).toBeGreaterThanOrEqual(-0.5);
 					expect(Number.isFinite(b.yaw)).toBe(true);
 				}
 				expect(camera.pos[1]).toBeGreaterThanOrEqual(EYE_MIN);
@@ -50,7 +53,7 @@ describe('presetar', () => {
 		for (const name of PRESET_NAMES) {
 			const strip = (p: ReturnType<typeof buildPreset>) =>
 				JSON.stringify({
-					boxes: p.boxes.map((b) => ({ min: b.min, size: b.size, yaw: b.yaw })),
+					boxes: p.boxes.map((b) => ({ min: b.min, size: b.size, yaw: b.yaw, pitch: b.pitch ?? 0 })),
 					camera: p.camera
 				});
 			expect(strip(buildPreset(name, rng(5)))).toBe(strip(buildPreset(name, rng(5))));
@@ -90,12 +93,34 @@ describe('presetar', () => {
 		}
 	});
 
-	it('menneskeskala: folkemengd- og figurrekkje-figurar er 1.0–2.0 m', () => {
-		for (const name of ['folkemengd', 'figurrekkje'] as const) {
-			const { boxes } = buildPreset(name, rng(3));
-			const figs = boxes.filter((b) => b.size[1] >= 1000);
-			expect(figs.length).toBeGreaterThan(3);
-			for (const f of figs) expect(f.size[1]).toBeLessThanOrEqual(2000);
+	it('menneskeskala: folkemengd-figurar er 1.0–2.0 m', () => {
+		const { boxes } = buildPreset('folkemengd', rng(3));
+		const figs = boxes.filter((b) => b.size[1] >= 1000);
+		expect(figs.length).toBeGreaterThan(3);
+		for (const f of figs) expect(f.size[1]).toBeLessThanOrEqual(2000);
+	});
+
+	it('figurrekkje: leddstilte mannekengar i naturleg skala, på golvet', () => {
+		const { boxes } = buildPreset('figurrekkje', rng(3));
+		const grps = new Set(
+			boxes.filter((b) => b.grp?.startsWith('mq:')).map((b) => b.grp as string)
+		);
+		expect(grps.size).toBeGreaterThanOrEqual(4);
+		for (const g of grps) {
+			const parts = boxes.filter((b) => b.grp === g);
+			expect(parts.length).toBe(16);
+			let lo = Infinity;
+			let hi = -Infinity;
+			for (const p of parts) {
+				for (const c of boxCorners(p)) {
+					if (c[1] < lo) lo = c[1];
+					if (c[1] > hi) hi = c[1];
+				}
+			}
+			expect(lo).toBeGreaterThanOrEqual(-0.5); // bakkenormalisert
+			expect(lo).toBeLessThanOrEqual(0.5);
+			expect(hi - lo).toBeGreaterThanOrEqual(650); // sitgolv/hukande er låge
+			expect(hi - lo).toBeLessThanOrEqual(2350); // vinkande hand over hovudet er naturleg
 		}
 	});
 

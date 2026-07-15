@@ -4,7 +4,7 @@
 
 import { project, type Frame, type V3 } from './projection';
 import { sampleSegment, type Polyline, type SampleOpts } from './sample';
-import { boxCorners, centroid, EDGE_IDX, VERTICAL_EDGE_START, type Box, type Doc } from './scene';
+import { boxCorners, centroid, EDGE_IDX, orientBox, VERTICAL_EDGE_START, type Box, type Doc } from './scene';
 
 export const INK_W_NEAR = 2.0;
 export const INK_W_FAR = 0.8;
@@ -45,12 +45,6 @@ export type InkOpts = {
 	sample?: SampleOpts;
 };
 
-function rotYv(p: V3, a: number): V3 {
-	const c = Math.cos(a);
-	const s = Math.sin(a);
-	return [p[0] * c + p[2] * s, p[1], -p[0] * s + p[2] * c];
-}
-
 // snu retninga på ein kant-sampel (liste av polylinjer)
 function reverseLines(lines: Polyline[]): Polyline[] {
 	const out: Polyline[] = [];
@@ -86,7 +80,7 @@ export function buildBoxInk(f: Frame, b: Box, opts: InkOpts): BoxInk {
 	const fills: Polyline[][] = [];
 	if (opts.maskFaces) {
 		for (const face of FACES) {
-			const nWorld = rotYv(face.normal, b.yaw);
+			const nWorld = orientBox(face.normal, b);
 			// flatesentrum
 			const fc: V3 = [0, 0, 0];
 			for (const i of face.loop) {

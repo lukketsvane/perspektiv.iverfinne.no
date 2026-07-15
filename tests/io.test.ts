@@ -3,9 +3,10 @@ import { parseDoc, serializeDoc } from '../src/lib/perspective/io';
 import { defaultDoc } from '../src/lib/perspective/scene';
 
 describe('io (json inn/ut)', () => {
-	it('round-trip beheld boksar, kamera og innstillingar (tema, lås, fit)', () => {
+	it('round-trip beheld boksar (m/ pitch og grp), kamera og innstillingar', () => {
 		const doc = defaultDoc();
 		doc.boxes.push({ id: 'a', min: [0, 0, -2000], size: [500, 1750, 300], yaw: 0.5 });
+		doc.boxes.push({ id: 'b', min: [0, 900, -2000], size: [80, 420, 80], yaw: 0.5, pitch: 0.7, grp: 'mq:gaande:1750:x1' });
 		doc.settings.theme = 'dark';
 		doc.settings.locked = true;
 		doc.settings.fit = 'inscribe';
@@ -26,7 +27,7 @@ describe('io (json inn/ut)', () => {
 		expect(s.locked).toBe(false);
 	});
 
-	it('v1-dokument migrerer fit → cover; v2 beheld valet', () => {
+	it('v1-dokument migrerer fit → cover; v2/v3 beheld valet', () => {
 		const legacy = JSON.stringify({
 			version: 1,
 			boxes: [{ id: 'a', min: [0, 0, 0], size: [500, 500, 500], yaw: 0 }],
@@ -35,10 +36,11 @@ describe('io (json inn/ut)', () => {
 		});
 		const doc = parseDoc(legacy);
 		expect(doc).not.toBeNull();
-		expect(doc!.version).toBe(2);
+		expect(doc!.version).toBe(3);
 		expect(doc!.settings.fit).toBe('cover'); // gammal default vart migrert
 		expect(doc!.settings.theme).toBe('dark'); // aktive val overlever
 		expect(doc!.boxes.length).toBe(1);
+		expect(doc!.boxes[0].pitch).toBeUndefined(); // v1/v2-boksar er upitcha
 
 		const kept = parseDoc(JSON.stringify({ version: 2, settings: { fit: 'inscribe' } }));
 		expect(kept!.settings.fit).toBe('inscribe'); // v2: inscribe er eit medvite val
@@ -46,7 +48,7 @@ describe('io (json inn/ut)', () => {
 
 	it('avviser feil versjon og ugyldig json; sanerer boksar', () => {
 		expect(parseDoc('ikkje json')).toBeNull();
-		expect(parseDoc(JSON.stringify({ version: 3 }))).toBeNull();
+		expect(parseDoc(JSON.stringify({ version: 4 }))).toBeNull();
 		const messy = JSON.stringify({
 			version: 1,
 			boxes: [

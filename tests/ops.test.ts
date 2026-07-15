@@ -1,11 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { applyAction, makeUi } from '../src/lib/ui/ops';
 import { defaultDoc } from '../src/lib/perspective/scene';
+import { makeFrame } from '../src/lib/perspective/projection';
 
 function rig() {
 	let t = 1000;
 	const ui = makeUi(defaultDoc(), () => t);
 	return { ui, advance: (ms: number) => (t += ms) };
+}
+
+// ramme så peikar-/stempelhandlingar har unproject å arbeide med
+function withFrame(ui: ReturnType<typeof makeUi>) {
+	ui.frame = makeFrame(ui.doc.camera, { w: 1200, h: 800, fit: ui.doc.settings.fit });
 }
 
 describe('referanselås (v1.2)', () => {
@@ -65,5 +71,64 @@ describe('tema', () => {
 		expect(ui.dirty).toBe(true);
 		applyAction(ui, { t: 'theme-toggle' });
 		expect(ui.doc.settings.theme).toBe('light');
+	});
+});
+
+describe('mannekeng i ops (v2.1)', () => {
+	it('figure-stamp set inn 16-delars gruppe; f byter positur; slett fjernar alt; angre gjenopprettar', () => {
+		const { ui } = rig();
+		withFrame(ui);
+		applyAction(ui, { t: 'figure-stamp', x: 600, y: 560 });
+		expect(ui.doc.boxes.length).toBe(16);
+		const grp0 = ui.doc.boxes[0].grp!;
+		expect(grp0.startsWith('mq:staande:')).toBe(true);
+		expect(ui.selection).toBe(ui.doc.boxes[0].id);
+
+		// f: positur-syklus staande → gaande, framleis 16 delar, same uid
+		applyAction(ui, { t: 'figure-key' });
+		expect(ui.doc.boxes.length).toBe(16);
+		const grp1 = ui.doc.boxes[0].grp!;
+		expect(grp1.startsWith('mq:gaande:')).toBe(true);
+		expect(grp1.split(':')[3]).toBe(grp0.split(':')[3]);
+
+		// angre positur-byte → staande att; angre stempel → tomt
+		applyAction(ui, { t: 'undo' });
+		expect(ui.doc.boxes[0].grp).toBe(grp0);
+		expect(ui.doc.boxes.length).toBe(16);
+		applyAction(ui, { t: 'undo' });
+		expect(ui.doc.boxes.length).toBe(0);
+		applyAction(ui, { t: 'redo' });
+		expect(ui.doc.boxes.length).toBe(16);
+
+		// slett: heile gruppa forsvinn som eitt steg; angre hentar alt attende
+		applyAction(ui, { t: 'select', id: ui.doc.boxes[5].id });
+		applyAction(ui, { t: 'delete-selected' });
+		expect(ui.doc.boxes.length).toBe(0);
+		applyAction(ui, { t: 'undo' });
+		expect(ui.doc.boxes.length).toBe(16);
+	});
+
+	it('flytt på gruppemedlem flytter heile mannekengen', () => {
+		const { ui } = rig();
+		withFrame(ui);
+		applyAction(ui, { t: 'figure-stamp', x: 600, y: 560 });
+		const before = ui.doc.boxes.map((b) => [...b.min] as [number, number, number]);
+		const grabbed = ui.doc.boxes[3];
+		applyAction(ui, { t: 'move-start', id: grabbed.id, x: 600, y: 560, duplicate: false });
+		applyAction(ui, { t: 'move-update', x: 660, y: 560 });
+		applyAction(ui, { t: 'move-commit' });
+		const dx = ui.doc.boxes[3].min[0] - before[3][0];
+		const dz = ui.doc.boxes[3].min[2] - before[3][2];
+		expect(Math.hypot(dx, dz)).toBeGreaterThan(1);
+		for (let i = 0; i < ui.doc.boxes.length; i++) {
+			expect(ui.doc.boxes[i].min[0] - before[i][0]).toBeCloseTo(dx, 6);
+			expect(ui.doc.boxes[i].min[2] - before[i][2]).toBeCloseTo(dz, 6);
+			expect(ui.doc.boxes[i].min[1]).toBeCloseTo(before[i][1], 6); // y uendra
+		}
+		// angre flyttinga (batch): alle attende
+		applyAction(ui, { t: 'undo' });
+		for (let i = 0; i < ui.doc.boxes.length; i++) {
+			expect(ui.doc.boxes[i].min[0]).toBeCloseTo(before[i][0], 6);
+		}
 	});
 });
