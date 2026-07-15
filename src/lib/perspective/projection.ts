@@ -141,9 +141,9 @@ function mapInv(proj: ProjName, rn: number, thetaMax: number): number {
 // ---- projeksjon ----
 
 export function projectDir(f: Frame, d: V3): Projected {
-	const xp = vdot(d, f.right);
-	const yp = vdot(d, f.up);
-	const zp = vdot(d, f.fwd);
+	const xp = d[0] * f.right[0] + d[1] * f.right[1] + d[2] * f.right[2];
+	const yp = d[0] * f.up[0] + d[1] * f.up[1] + d[2] * f.up[2];
+	const zp = d[0] * f.fwd[0] + d[1] * f.fwd[1] + d[2] * f.fwd[2];
 
 	if (isPano(f.proj)) {
 		// asimut kring yaw-aksen, elevasjon mot +y; pitch skrollar vertikalt
@@ -172,11 +172,18 @@ export function projectDir(f: Frame, d: V3): Projected {
 	return { x: f.cx + f.R * rn * cphi, y: f.cy - f.R * rn * sphi, visible: true };
 }
 
+const SCRATCH_DIR: V3 = [0, 0, 0];
+
 export function project(f: Frame, p: V3): Projected {
-	const d: V3 = [p[0] - f.pos[0], p[1] - f.pos[1], p[2] - f.pos[2]];
-	const l = vlen(d);
+	const dx = p[0] - f.pos[0];
+	const dy = p[1] - f.pos[1];
+	const dz = p[2] - f.pos[2];
+	const l = Math.hypot(dx, dy, dz);
 	if (l === 0) return { x: 0, y: 0, visible: false };
-	return projectDir(f, [d[0] / l, d[1] / l, d[2] / l]);
+	SCRATCH_DIR[0] = dx / l;
+	SCRATCH_DIR[1] = dy / l;
+	SCRATCH_DIR[2] = dz / l;
+	return projectDir(f, SCRATCH_DIR);
 }
 
 // skjermpunkt → verdsretning (einingsvektor); ray = (C, d)
