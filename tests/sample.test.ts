@@ -99,6 +99,24 @@ describe('adaptiv sampling (§9.5)', () => {
 	});
 });
 
+describe('panorama-saum (M7)', () => {
+	it('segment gjennom asimut ±180° vert brote ved saumen', () => {
+		const f = makeFrame(cam({ proj: 'pano-equi', fov: 160 * DEG, pos: [0, 1780, 0] }), VIEW);
+		const proj = (p: V3) => project(f, p);
+		// line bak kameraet: kryssar asimut π
+		const A: V3 = [-5000, 1780, 2000];
+		const B: V3 = [5000, 1780, 2000];
+		const maxJump = VIEW.w / 3;
+		const lines = sampleSegment(proj, A, B, { camPos: f.pos, maxJumpPx: maxJump });
+		expect(lines.length).toBeGreaterThanOrEqual(2);
+		for (const line of lines) {
+			for (let i = 0; i + 3 < line.length; i += 2) {
+				expect(Math.abs(line[i + 2] - line[i])).toBeLessThanOrEqual(maxJump);
+			}
+		}
+	});
+});
+
 describe('storsirkel-loop', () => {
 	it('horisonten ved τ≠0, equi 360: lukka kurve innanfor randa', () => {
 		// horisonten spenner θ ∈ [τ, 180°−τ]; lukka bilete krev full sfære (fov 360, equi)

@@ -18,7 +18,8 @@ export const FOV_LIMITS: Record<ProjName, [number, number]> = {
 	'pano-cyl': [60 * DEG, 150 * DEG]
 };
 
-export const PROJ_ORDER: ProjName[] = ['stereo', 'equi', 'linear'];
+// p-brytaren går heile vegen rundt: sirkel-modi fyrst, så stripene (M7)
+export const PROJ_ORDER: ProjName[] = ['stereo', 'equi', 'linear', 'pano-equi', 'pano-cyl'];
 
 export function defaultCamera(): CameraState {
 	return { pos: [0, 1780, 4000], yaw: 0, pitch: 0, fov: 220 * DEG, proj: 'stereo' };
