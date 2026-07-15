@@ -5,8 +5,8 @@
 // determinisme). kvar scene har fleire DESIGNA synspunkt (augehøgd, fov,
 // retning forankra i boksane); randomiseringa vel eitt.
 
-import type { CameraState, V3 } from './projection';
-import { FIGURBOKS, newId, type Box } from './scene';
+import { makeFrame, project, type CameraState, type V3 } from './projection';
+import { centroid, FIGURBOKS, newId, pointInBox, type Box } from './scene';
 
 export type Rng = () => number;
 
@@ -19,7 +19,11 @@ export type PresetName =
 	| 'figurrekkje'
 	| 'gate'
 	| 'teiknekveld'
-	| 'interiør';
+	| 'interiør'
+	| 'marknad'
+	| 'containerhamn'
+	| 'byggeplass'
+	| 'bibliotek';
 
 export const PRESET_NAMES: PresetName[] = [
 	'folkemengd',
@@ -30,7 +34,11 @@ export const PRESET_NAMES: PresetName[] = [
 	'figurrekkje',
 	'gate',
 	'teiknekveld',
-	'interiør'
+	'interiør',
+	'marknad',
+	'containerhamn',
+	'byggeplass',
+	'bibliotek'
 ];
 
 export type Preset = { boxes: Box[]; camera: CameraState };
@@ -614,6 +622,244 @@ function interiør(rng: Rng): Preset {
 	return { boxes, camera };
 }
 
+// --- marknad: bodar med stolpar og tak, seljarar bak borda, kundar i midtgangen ---
+function marknad(rng: Rng): Preset {
+	const boxes: Box[] = [];
+	const aisleHalf = 1900;
+	const nPerSide = ri(rng, 3, 4);
+	const pitch = 2900;
+	const z0 = (-(nPerSide - 1) / 2) * pitch;
+	for (const side of [-1, 1]) {
+		for (let i = 0; i < nPerSide; i++) {
+			if (rng() < 0.15) continue; // hol i rekkja
+			const x = side * (aisleHalf + 750) + r(rng, -120, 120);
+			const z = z0 + i * pitch + r(rng, -160, 160);
+			const yaw = (side < 0 ? Math.PI / 2 : -Math.PI / 2) + r(rng, -0.06, 0.06);
+			boxes.push(bx(x, 0, z, 1800, 900, 800, yaw)); // bord
+			// fire hjørnestolpar + tak
+			const dir: [number, number] = [Math.sin(yaw), Math.cos(yaw)];
+			const perp: [number, number] = [Math.cos(yaw), -Math.sin(yaw)];
+			for (const [a, bSign] of [
+				[1, 1],
+				[1, -1],
+				[-1, 1],
+				[-1, -1]
+			] as Array<[number, number]>) {
+				boxes.push(
+					bx(x + perp[0] * 950 * a + dir[0] * 550 * bSign, 0, z + perp[1] * 950 * a + dir[1] * 550 * bSign, 80, 2150, 80, yaw)
+				);
+			}
+			boxes.push(bx(x, 2150, z, 2100, 90, 1350, yaw)); // tak-slab
+			// varer og kassar
+			if (rng() < 0.7) boxes.push(bx(x + perp[0] * r(rng, -500, 500), 900, z + perp[1] * r(rng, -500, 500), 450, 260, 350, yaw + r(rng, -0.3, 0.3)));
+			if (rng() < 0.5) boxes.push(bx(x + dir[0] * 900, 0, z + dir[1] * 900, 500, 420, 400, yaw + r(rng, -0.4, 0.4)));
+			// seljar bak bordet
+			boxes.push(
+				person(rng, x - dir[0] * 900, z - dir[1] * 900, Math.atan2(dir[0], dir[1]) + r(rng, -0.2, 0.2), weightedPose(rng, [
+					['staande', 2],
+					['lener', 2],
+					['boygd', 1]
+				]))
+			);
+		}
+	}
+	// kundar i midtgangen
+	const walkDir = rng() < 0.5 ? 0 : Math.PI;
+	for (let i = 0; i < ri(rng, 3, 5); i++) {
+		const z = z0 + r(rng, -800, (nPerSide - 1) * pitch + 800);
+		boxes.push(
+			person(rng, r(rng, -1100, 1100), z, walkDir + r(rng, -0.5, 0.5), weightedPose(rng, [
+				['gaande', 3],
+				['staande', 2],
+				['lener', 1]
+			]), rng() < 0.15 ? r(rng, 0.62, 0.74) : 1)
+		);
+	}
+	if (rng() < 0.4) boxes.push(...dog(rng, r(rng, -900, 900), z0 + r(rng, 0, nPerSide * pitch * 0.6), r(rng, 0, Math.PI * 2)));
+	const camera = pick(rng, [
+		// kunde midt i gangen, ser nedover marknaden
+		lookFrom([r(rng, -500, 500), 1650, z0 - 2400], [0, 1200, z0 + nPerSide * pitch * 0.6], 222),
+		// barneauge mellom bodane
+		lookFrom([r(rng, -700, 700), 1010, z0 + pitch], [300, 1500, z0 + nPerSide * pitch], 232),
+		// bak ein bod, over seljarskuldra mot gangen
+		lookFrom([aisleHalf + 2300, 1600, z0 + pitch * 1.2], [-500, 1000, z0 + pitch * 2.2], 228)
+	]);
+	return { boxes, camera };
+}
+
+// --- containerhamn: stabla containerar i rekkjer, smale gater, kranbein ---
+function containerhamn(rng: Rng): Preset {
+	const boxes: Box[] = [];
+	const C: [number, number, number] = [2440, 2600, 6060];
+	const rows = ri(rng, 2, 3);
+	const perRow = ri(rng, 3, 4);
+	const gate = r(rng, 3200, 4200); // gategap mellom rekkjene
+	const x0 = (-(rows - 1) / 2) * (C[0] + gate);
+	const z0 = (-(perRow - 1) / 2) * (C[2] + 900);
+	for (let rI = 0; rI < rows; rI++) {
+		for (let i = 0; i < perRow; i++) {
+			if (rng() < 0.12) continue;
+			const x = x0 + rI * (C[0] + gate) + r(rng, -80, 80);
+			const z = z0 + i * (C[2] + 900) + r(rng, -220, 220);
+			const yaw = r(rng, -0.025, 0.025);
+			const stackH = ri(rng, 1, 3);
+			for (let sI = 0; sI < stackH; sI++) {
+				boxes.push(bx(x + r(rng, -60, 60), sI * C[1], z + r(rng, -60, 60), C[0], C[1], C[2], yaw + r(rng, -0.015, 0.015)));
+			}
+		}
+	}
+	// kran over midtgata: to bein + tverrbjelke
+	if (rng() < 0.7) {
+		const kz = z0 + r(rng, 0, (perRow - 1) * (C[2] + 900));
+		const legX = x0 + (C[0] + gate) / 2;
+		const span = C[0] + gate + 2400;
+		boxes.push(bx(legX - span / 2, 0, kz, 650, 8600, 650));
+		boxes.push(bx(legX + span / 2, 0, kz, 650, 8600, 650));
+		boxes.push(bx(legX, 8600, kz, span + 650, 700, 900));
+	}
+	// hamnearbeidarar i gata
+	for (let i = 0; i < ri(rng, 1, 3); i++) {
+		boxes.push(
+			person(rng, x0 + (C[0] + gate) / 2 + r(rng, -900, 900), z0 + r(rng, 0, (perRow - 1) * (C[2] + 900)), r(rng, 0, Math.PI * 2), weightedPose(rng, [
+				['gaande', 2],
+				['staande', 2],
+				['boygd', 1]
+			]))
+		);
+	}
+	const gapX = x0 + (C[0] + gate) / 2;
+	const camera = pick(rng, [
+		// i containergata: stålveggane sveipar i fiskeauget
+		lookFrom([gapX + r(rng, -600, 600), 1650, z0 - 3400], [gapX, 2200, z0 + perRow * (C[2] + 900) * 0.7], 230),
+		// oppå ein stabel, ser ned gata
+		lookFrom([gapX - (C[0] + gate) / 2 - 600, 5600, z0 - 1500], [gapX, 1200, z0 + perRow * (C[2] + 900) * 0.55], 238),
+		// arbeidarauge tett på eit hjørne
+		lookFrom([gapX - 1500, 1450, z0 + 2400], [gapX + 2600, 2600, z0 + 8200], 226)
+	]);
+	return { boxes, camera };
+}
+
+// --- byggeplass: stillasgrid av stolpar og bjelkar, pallar, arbeidarar ---
+function byggeplass(rng: Rng): Preset {
+	const boxes: Box[] = [];
+	const cols = ri(rng, 3, 4);
+	const rowsN = 2;
+	const gx = 2100;
+	const gz = 2300;
+	const x0 = (-(cols - 1) / 2) * gx;
+	const z0 = (-(rowsN - 1) / 2) * gz;
+	const lvls = ri(rng, 2, 3);
+	// stolpar
+	for (let cI = 0; cI < cols; cI++) {
+		for (let rI = 0; rI < rowsN; rI++) {
+			boxes.push(bx(x0 + cI * gx, 0, z0 + rI * gz, 110, lvls * 2000 + 400, 110));
+		}
+	}
+	// bjelkar i x-retning per nivå + plattingar
+	for (let lvl = 1; lvl <= lvls; lvl++) {
+		const y = lvl * 2000;
+		for (let rI = 0; rI < rowsN; rI++) {
+			boxes.push(bx(0, y, z0 + rI * gz, (cols - 1) * gx + 300, 110, 110));
+		}
+		if (rng() < 0.8) {
+			const cI = ri(rng, 0, cols - 2);
+			boxes.push(bx(x0 + cI * gx + gx / 2, y + 60, 0, gx, 70, gz + 400)); // platting
+			if (rng() < 0.6) {
+				// arbeidar oppå plattinga
+				const worker = person(
+					rng,
+					x0 + cI * gx + gx / 2 + r(rng, -500, 500),
+					r(rng, -600, 600),
+					r(rng, 0, Math.PI * 2),
+					weightedPose(rng, [
+						['boygd', 2],
+						['hukande', 2],
+						['staande', 1]
+					])
+				);
+				worker.min[1] = y + 130;
+				boxes.push(worker);
+			}
+		}
+	}
+	// pallar og materialstablar på bakken
+	for (let i = 0; i < ri(rng, 3, 5); i++) {
+		const x = r(rng, x0 - 2600, x0 + cols * gx + 800);
+		const z = r(rng, -3400, 3400);
+		const yaw = r(rng, 0, Math.PI * 2);
+		boxes.push(bx(x, 0, z, 1200, 150, 1000, yaw));
+		if (rng() < 0.75) boxes.push(bx(x, 150, z, r(rng, 800, 1100), r(rng, 500, 900), r(rng, 700, 950), yaw + r(rng, -0.1, 0.1)));
+	}
+	// arbeidarar på bakken
+	for (let i = 0; i < ri(rng, 2, 3); i++) {
+		boxes.push(
+			person(rng, r(rng, x0 - 1800, x0 + cols * gx + 600), r(rng, -3000, 3000), r(rng, 0, Math.PI * 2), weightedPose(rng, [
+				['boygd', 2],
+				['hukande', 1],
+				['gaande', 2],
+				['staande', 1]
+			]))
+		);
+	}
+	const camera = pick(rng, [
+		// inne i stillaset: gridet rammar alt
+		lookFrom([x0 + gx * 0.6, 1620, z0 + gz + 2900], [x0 + (cols - 1) * gx * 0.5, 2400, z0], 232),
+		// oppå plattinga, ser ned og bort
+		lookFrom([x0 + gx, lvls * 2000 + 1500, 1200], [x0 + (cols - 1) * gx, 800, -2600], 236),
+		// froskeblikk tett innunder stillaset: stolpane tårnar
+		lookFrom([x0 - 900, 540, 1700], [x0 + (cols - 1) * gx * 0.55, 2600, z0 - 600], 244)
+	]);
+	return { boxes, camera };
+}
+
+// --- bibliotek: hyllerekkjer som smale gater, lesebord, sitjande lesarar ---
+function bibliotek(rng: Rng): Preset {
+	const boxes: Box[] = [];
+	const rowsN = ri(rng, 3, 5);
+	const segs = ri(rng, 2, 4);
+	const pitch = r(rng, 1700, 2100); // gate mellom hyllene
+	const x0 = (-(rowsN - 1) / 2) * pitch;
+	const segL = 2200;
+	const z0 = (-(segs * segL) / 2) * 0.5;
+	for (let rI = 0; rI < rowsN; rI++) {
+		for (let sI = 0; sI < segs; sI++) {
+			if (rng() < 0.07) continue;
+			boxes.push(bx(x0 + rI * pitch, 0, z0 + sI * (segL + 250), 320, r(rng, 2050, 2300), segL, r(rng, -0.02, 0.02)));
+		}
+	}
+	// browsarar i gangane
+	for (let i = 0; i < ri(rng, 2, 4); i++) {
+		const lane = ri(rng, 0, rowsN - 2);
+		boxes.push(
+			person(rng, x0 + lane * pitch + pitch / 2 + r(rng, -220, 220), z0 + r(rng, 0, segs * segL), rng() < 0.5 ? Math.PI / 2 : -Math.PI / 2, weightedPose(rng, [
+				['staande', 3],
+				['lener', 2],
+				['hukande', 1]
+			]))
+		);
+	}
+	// lesekrok framfor hyllene
+	const tz = z0 + segs * (segL + 250) + 2100;
+	for (let i = 0; i < ri(rng, 2, 3); i++) {
+		const tx = r(rng, x0, x0 + (rowsN - 1) * pitch);
+		const yaw = r(rng, -0.2, 0.2);
+		boxes.push(bx(tx, 0, tz, 1600, 750, 900, yaw));
+		boxes.push(bx(tx - 500, 0, tz + 800, 420, 450, 420, yaw));
+		const reader = person(rng, tx - 500, tz + 780, yaw + Math.PI, 'sitjande');
+		boxes.push(reader);
+		if (rng() < 0.6) boxes.push(bx(tx + r(rng, -300, 300), 750, tz + r(rng, -200, 200), 350, 60, 250, r(rng, 0, 0.5))); // open bok
+	}
+	const camera = pick(rng, [
+		// i hyllegata: kunnskapskløfta
+		lookFrom([x0 + pitch / 2, 1620, z0 - 2600], [x0 + pitch / 2 + r(rng, -200, 200), 1500, z0 + segs * segL], 228),
+		// sitjande lesar ser opp mot hyllene
+		lookFrom([x0 + pitch, 1130, tz - 300], [x0 + pitch * 0.5, 1700, z0 + segL], 224),
+		// hjørnehøgt oversyn
+		lookFrom([x0 - 2400, 2900, tz + 1400], [x0 + (rowsN - 1) * pitch * 0.6, 900, z0 + segL], 226)
+	]);
+	return { boxes, camera };
+}
+
 const GENERATORS: Record<PresetName, (rng: Rng) => Preset> = {
 	folkemengd,
 	klasserom,
@@ -623,7 +869,11 @@ const GENERATORS: Record<PresetName, (rng: Rng) => Preset> = {
 	figurrekkje,
 	gate,
 	teiknekveld,
-	interiør
+	interiør,
+	marknad,
+	containerhamn,
+	byggeplass,
+	bibliotek
 };
 
 export function buildPreset(name: PresetName, rng: Rng): Preset {
@@ -632,4 +882,62 @@ export function buildPreset(name: PresetName, rng: Rng): Preset {
 
 export function randomPresetName(rng: Rng): PresetName {
 	return PRESET_NAMES[Math.floor(rng() * PRESET_NAMES.length) % PRESET_NAMES.length];
+}
+
+// ---- kvalitetsvakt: KVAR lasting skal vere eit sterkt startpunkt ----
+// komposisjonen vert skåra (0..1) i skjermrommet til det valde kameraet:
+// - hard null: kamera inne i ein boks, eller < 3 synlege boksar
+// - visFrac: del av boksane som faktisk er i biletet
+// - spreiing: kor mykje av ramma dei synlege boksane spenner
+// - nærfelt: næraste boks bør ruve (0.35–5.2 m frå auget)
+// - tal: minst ~6 boksar i biletet gjev full utteljing
+
+export const PRESET_SCORE_MIN = 0.55;
+
+export function scorePreset(p: Preset, view = { w: 1200, h: 800 }): number {
+	if (p.boxes.length === 0) return 0;
+	const f = makeFrame(p.camera, { w: view.w, h: view.h, fit: 'cover' });
+	let vis = 0;
+	let minX = Infinity;
+	let maxX = -Infinity;
+	let minY = Infinity;
+	let maxY = -Infinity;
+	let dNear = Infinity;
+	for (const b of p.boxes) {
+		if (pointInBox(f.pos, b)) return 0;
+		const c = centroid(b);
+		const s = project(f, c);
+		if (!s.visible) continue;
+		if (s.x < -60 || s.x > view.w + 60 || s.y < -60 || s.y > view.h + 60) continue;
+		vis++;
+		if (s.x < minX) minX = s.x;
+		if (s.x > maxX) maxX = s.x;
+		if (s.y < minY) minY = s.y;
+		if (s.y > maxY) maxY = s.y;
+		const d = Math.hypot(c[0] - f.pos[0], c[1] - f.pos[1], c[2] - f.pos[2]);
+		if (d < dNear) dNear = d;
+	}
+	if (vis < 3) return 0;
+	const visFrac = vis / p.boxes.length;
+	const spread = ((maxX - minX) * (maxY - minY)) / (view.w * view.h);
+	const near =
+		dNear < 350 ? dNear / 350 : dNear <= 5200 ? 1 : Math.max(0, 1 - (dNear - 5200) / 5200);
+	const count = Math.min(1, vis / 6);
+	return 0.3 * visFrac + 0.25 * Math.min(1, spread / 0.32) + 0.25 * near + 0.2 * count;
+}
+
+// trekk om att til komposisjonen står seg; behald beste forsøket som fallback
+export function buildGreatPreset(name: PresetName, rng: Rng, tries = 10): Preset {
+	let best: Preset | null = null;
+	let bestScore = -1;
+	for (let i = 0; i < tries; i++) {
+		const p = buildPreset(name, rng);
+		const s = scorePreset(p);
+		if (s > bestScore) {
+			best = p;
+			bestScore = s;
+		}
+		if (s >= PRESET_SCORE_MIN) return p;
+	}
+	return best as Preset;
 }

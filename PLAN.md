@@ -227,6 +227,8 @@ budsjett: sampler + teikning < 6 ms/frame ved 200 boksar (m1 macbook / ipad pro)
 - **dokumentversjon 2** (v1.3): v1-lagringar migrerer `fit` → cover ved lasting (gamal default skal ikkje overstyre ny); aktive val elles overlever. kompaktare ark (to kolonnar, rulletak) og mindre verktøylinjeknappar.
 - **navigasjon fyrst** (v1.4, reviderer §4): å sjå skal koste ingenting, å plassere/redigere skal vere medvite. drag (mus som finger) ser seg om; klikk/tapp vel; drag redigerer berre den valde boksen. nye boksar krev anten teiknemodus (blyant-knappen / `b` — då gjeld §4-tabellen som før), long-press på golvet (touch), eller penn — apple pencil går alltid i redigeringsløypa. to-finger pan = gange i navigasjonsmodus (sjå i teiknemodus); resten av §4 står. flyktige hint i hud-en («dra fotavtrykket», «dra høgda · tapp festar») + fyrstegongstips på tomt papir.
 
+- **kvalitetsvakt for presetar** (v1.5): kvar `t`-lasting vert komposisjons-skåra i skjermrommet (del synlege boksar, spreiing i ramma, nærfelt 0.35–5.2 m, aldri kamera inne i ein boks) og trekt om att til skåren står seg (`buildGreatPreset`, golv 0.55); testgaranti 13 presetar × 30 seed. fire nye scener: marknad (bodar m/ stolpar+tak), containerhamn (stabla containergater + kran), byggeplass (stillasgrid, plattingar, pallar), bibliotek (hyllegater + lesekrok).
+
 ## 11. opne val
 
 1. stakken i repoet: går ut frå sveltekit + ts + vitest + pnpm; stemmer det?
