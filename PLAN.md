@@ -216,6 +216,11 @@ budsjett: sampler + teikning < 6 ms/frame ved 200 boksar (m1 macbook / ipad pro)
 - v0-utkastet er interaksjonsskisse, ikkje kjelde: ikkje arv rendering eller kamerakode derifrå; projeksjonskjernen kjem frå §2 og skal passere §9
 - ikkje legg til funksjonar utanfor milepælen utan å spørje
 
+## 10b. endringar etter v1 (vedteke i økt, juli 2026)
+
+- **meter i grensesnittet**: hud, horisontmerke og taltasting viser/tolkar meter (1.78⏎ = ståande auge). kjerna, snapping og json er framleis mm (§2 uendra); berre presentasjonslaget byter eining.
+- **scene-presetar med randomisering**: `presets.ts` med seks generatorar i menneskeskala — folkemengd, klasserom, verkstad, stall (hestar av boksar), hovudstudie (boksa hovud på soklar), figurrekkje. `t` lastar tilfeldig preset; arket listar alle. lastinga er eitt angre-steg (scene-kommando i history).
+
 ## 11. opne val
 
 1. stakken i repoet: går ut frå sveltekit + ts + vitest + pnpm; stemmer det?

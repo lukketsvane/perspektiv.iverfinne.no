@@ -76,7 +76,9 @@ export type Action =
 	| { t: 'export-json' }
 	// frå arket (Sheet); motoren emitterer ikkje desse sjølv
 	| { t: 'settings-patch'; patch: Record<string, boolean | string> }
-	| { t: 'proj-set'; proj: string };
+	| { t: 'proj-set'; proj: string }
+	// preset-lasting: null = tilfeldig val (t-tasten)
+	| { t: 'preset-load'; name: string | null };
 
 export type Host = {
 	now?: () => number;
@@ -842,6 +844,10 @@ export function createGestures(host: Host) {
 		}
 		if (k === 'o') {
 			emit({ t: 'faces-toggle' });
+			return true;
+		}
+		if (k === 't') {
+			emit({ t: 'preset-load', name: null });
 			return true;
 		}
 		if ((key === 'Delete' || key === 'Backspace' || k === 'x') && host.hasSelection()) {
