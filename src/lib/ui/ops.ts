@@ -17,7 +17,11 @@ import {
 	type Ray,
 	type Settings
 } from '../perspective/scene';
-import { unproject, type Frame, type V3 } from '../perspective/projection';
+import { unproject, type Frame, type ProjName, type V3 } from '../perspective/projection';
+import { makeHistory, pushCmd, redo as histRedo, undo as histUndo, type History } from '../perspective/history';
+import { parseDoc } from '../perspective/io';
+import { docToSvg } from '../perspective/svg';
+import { FOV_LIMITS } from '../perspective/camera';
 import type { Action, NumericCtx } from './gestures';
 
 // aktiv boks-gest med før-tilstand for avbrot
@@ -41,6 +45,7 @@ export type Ui = {
 	sheet: { open: boolean; x: number; y: number };
 	gridPreset: number;
 	gest: Gest;
+	history: History;
 	dirty: boolean;
 	now: () => number;
 };
@@ -58,9 +63,89 @@ export function makeUi(doc: Doc, now: () => number): Ui {
 		sheet: { open: false, x: 0, y: 0 },
 		gridPreset: 0,
 		gest: null,
+		history: makeHistory(),
 		dirty: true,
 		now
 	};
+}
+
+// byt ut dokumentinnhaldet på staden (import/lasting); nullstiller historikken
+export function replaceDoc(ui: Ui, next: Doc): void {
+	ui.doc.boxes = next.boxes;
+	Object.assign(ui.doc.camera, next.camera);
+	Object.assign(ui.doc.settings, next.settings);
+	ui.selection = null;
+	ui.gest = null;
+	ui.ghost = null;
+	ui.footprint = null;
+	ui.history = makeHistory();
+	ui.dirty = true;
+}
+
+export function importJson(ui: Ui, json: string): boolean {
+	const parsed = parseDoc(json);
+	if (!parsed) return false;
+	replaceDoc(ui, parsed);
+	return true;
+}
+
+function download(name: string, text: string, mime: string): void {
+	if (typeof document === 'undefined') return;
+	const a = document.createElement('a');
+	a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+	a.download = name;
+	a.click();
+	setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+function boxesEqual(a: Box, b: Box): boolean {
+	return (
+		a.min[0] === b.min[0] &&
+		a.min[1] === b.min[1] &&
+		a.min[2] === b.min[2] &&
+		a.size[0] === b.size[0] &&
+		a.size[1] === b.size[1] &&
+		a.size[2] === b.size[2] &&
+		a.yaw === b.yaw
+	);
+}
+
+// avslutt aktiv boks-gest og registrer kommandoen i historikken
+function commitGest(ui: Ui): void {
+	const g = ui.gest;
+	ui.gest = null;
+	if (!g || g.kind === 'draw') return;
+	const b = boxById(ui, g.id);
+	if (!b) return;
+	if (g.kind === 'move' && g.added) {
+		pushCmd(ui.history, { kind: 'add', box: cloneBox(b, b.id) });
+	} else if (!boxesEqual(g.backup, b)) {
+		pushCmd(ui.history, {
+			kind: 'update',
+			id: b.id,
+			before: cloneBox(g.backup, b.id),
+			after: cloneBox(b, b.id)
+		});
+	}
+}
+
+// enkeltendring utanfor gest (nudge, rotate-set/vmove-set i etterkant)
+function recordUpdate(ui: Ui, before: Box, b: Box): void {
+	if (boxesEqual(before, b)) return;
+	pushCmd(ui.history, {
+		kind: 'update',
+		id: b.id,
+		before,
+		after: cloneBox(b, b.id)
+	});
+}
+
+function deleteBoxById(ui: Ui, id: string): void {
+	const i = ui.doc.boxes.findIndex((b) => b.id === id);
+	if (i < 0) return;
+	pushCmd(ui.history, { kind: 'delete', box: cloneBox(ui.doc.boxes[i], id), index: i });
+	ui.doc.boxes.splice(i, 1);
+	if (ui.selection === id) ui.selection = null;
 }
 
 export const HUD_LINGER_MS = 800;
@@ -296,6 +381,7 @@ export function applyAction(ui: Ui, a: Action): void {
 			if (!ui.ghost) return;
 			ui.doc.boxes.push(ui.ghost);
 			ui.selection = ui.ghost.id;
+			pushCmd(ui.history, { kind: 'add', box: cloneBox(ui.ghost, ui.ghost.id) });
 			ui.ghost = null;
 			ui.gest = null;
 			break;
@@ -340,7 +426,7 @@ export function applyAction(ui: Ui, a: Action): void {
 		case 'pushpull-commit':
 		case 'vmove-commit':
 		case 'rotate-commit':
-			ui.gest = null;
+			commitGest(ui);
 			break;
 
 		case 'pushpull-start': {
@@ -397,9 +483,12 @@ export function applyAction(ui: Ui, a: Action): void {
 			break;
 		}
 		case 'vmove-set': {
-			const b = ui.gest?.kind === 'vmove' ? boxById(ui, ui.gest.id) : selectedBox(ui);
+			const inGest = ui.gest?.kind === 'vmove';
+			const b = inGest && ui.gest?.kind === 'vmove' ? boxById(ui, ui.gest.id) : selectedBox(ui);
 			if (!b) return;
+			const before = cloneBox(b, b.id);
 			b.min[1] = Math.max(0, a.mm);
+			if (!inGest) recordUpdate(ui, before, b);
 			hud(ui, `y ${b.min[1]} mm`);
 			break;
 		}
@@ -423,9 +512,12 @@ export function applyAction(ui: Ui, a: Action): void {
 			break;
 		}
 		case 'rotate-set': {
-			const b = ui.gest?.kind === 'rotate' ? boxById(ui, ui.gest.id) : selectedBox(ui);
+			const inGest = ui.gest?.kind === 'rotate';
+			const b = inGest && ui.gest?.kind === 'rotate' ? boxById(ui, ui.gest.id) : selectedBox(ui);
 			if (!b) return;
+			const before = cloneBox(b, b.id);
 			b.yaw = (a.deg * Math.PI) / 180;
+			if (!inGest) recordUpdate(ui, before, b);
 			hud(ui, `${Math.round(a.deg)}°`);
 			break;
 		}
@@ -437,23 +529,23 @@ export function applyAction(ui: Ui, a: Action): void {
 			const fb = figureBoxAt(newId(), snapMm(p[0]), snapMm(p[2]), 0, cam.pos);
 			ui.doc.boxes.push(fb);
 			ui.selection = fb.id;
+			pushCmd(ui.history, { kind: 'add', box: cloneBox(fb, fb.id) });
 			hud(ui, 'figurboks 500 × 1750 × 300');
 			break;
 		}
 		case 'delete-selected': {
 			if (!ui.selection) return;
-			ui.doc.boxes = ui.doc.boxes.filter((b) => b.id !== ui.selection);
-			ui.selection = null;
+			deleteBoxById(ui, ui.selection);
 			break;
 		}
 		case 'delete-box': {
-			ui.doc.boxes = ui.doc.boxes.filter((b) => b.id !== a.id);
-			if (ui.selection === a.id) ui.selection = null;
+			deleteBoxById(ui, a.id);
 			break;
 		}
 		case 'nudge': {
 			const b = selectedBox(ui);
 			if (!b) return;
+			const before = cloneBox(b, b.id);
 			const step = a.big ? 100 : 10;
 			// skjermrelative verdsaksar: dominant komponent av right/fwd
 			const rx = Math.cos(cam.yaw);
@@ -464,7 +556,60 @@ export function applyAction(ui: Ui, a: Action): void {
 			const F: [number, number] = Math.abs(fx) >= Math.abs(fz) ? [Math.sign(fx), 0] : [0, Math.sign(fz)];
 			b.min[0] += a.dxSteps * step * R[0] - a.dzSteps * step * F[0];
 			b.min[2] += a.dxSteps * step * R[1] - a.dzSteps * step * F[1];
+			recordUpdate(ui, before, b);
 			hudBoxPos(ui, b);
+			break;
+		}
+
+		// ---- historikk, eksport, ark (M5) ----
+		case 'undo': {
+			if (ui.gest || ui.ghost) return; // aldri midt i ein gest
+			if (histUndo(ui.history, ui.doc)) {
+				if (ui.selection && !boxById(ui, ui.selection)) ui.selection = null;
+				hud(ui, 'angre');
+			}
+			break;
+		}
+		case 'redo': {
+			if (ui.gest || ui.ghost) return;
+			if (histRedo(ui.history, ui.doc)) {
+				if (ui.selection && !boxById(ui, ui.selection)) ui.selection = null;
+				hud(ui, 'gjer om');
+			}
+			break;
+		}
+		case 'export-svg': {
+			if (!ui.frame) return;
+			download(
+				'femtepunkt.svg',
+				docToSvg(ui.doc, { w: ui.frame.w, h: ui.frame.h }),
+				'image/svg+xml'
+			);
+			hud(ui, 'svg eksportert');
+			break;
+		}
+		case 'export-json': {
+			download('femtepunkt.json', JSON.stringify(ui.doc, null, '\t'), 'application/json');
+			hud(ui, 'json eksportert');
+			break;
+		}
+		case 'sheet-open':
+			ui.sheet = { open: true, x: a.x, y: a.y };
+			break;
+		case 'settings-patch': {
+			for (const [k, v] of Object.entries(a.patch)) {
+				if (k === 'fit' && (v === 'cover' || v === 'inscribe')) s.fit = v;
+				else if (k in s && typeof v === 'boolean') (s as unknown as Record<string, boolean>)[k] = v;
+			}
+			break;
+		}
+		case 'proj-set': {
+			if (a.proj in FOV_LIMITS) {
+				cam.proj = a.proj as ProjName;
+				const [lo, hi] = FOV_LIMITS[cam.proj];
+				cam.fov = Math.min(hi, Math.max(lo, cam.fov));
+				hudFov(ui);
+			}
 			break;
 		}
 

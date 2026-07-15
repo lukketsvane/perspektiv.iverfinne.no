@@ -73,7 +73,10 @@ export type Action =
 	| { t: 'cancel' }
 	| { t: 'press-ring'; x: number; y: number; p: number } // 0..1; p<0 = fjern
 	| { t: 'export-svg' }
-	| { t: 'export-json' };
+	| { t: 'export-json' }
+	// frå arket (Sheet); motoren emitterer ikkje desse sjølv
+	| { t: 'settings-patch'; patch: Record<string, boolean | string> }
+	| { t: 'proj-set'; proj: string };
 
 export type Host = {
 	now?: () => number;
