@@ -63,6 +63,7 @@ export type Action =
 	| { t: 'rotate-commit' }
 	| { t: 'rotate-set'; deg: number }
 	| { t: 'figure-stamp'; x: number; y: number }
+	| { t: 'figure-key' }
 	| { t: 'delete-selected' }
 	| { t: 'delete-box'; id: string }
 	| { t: 'nudge'; dxSteps: number; dzSteps: number; big: boolean }
@@ -930,6 +931,11 @@ export function createGestures(host: Host) {
 		}
 		if (k === 'b') {
 			emit({ t: 'drawmode-toggle' });
+			return true;
+		}
+		if (k === 'f') {
+			// mannekeng: stemple ny, eller byt positur på den valde
+			emit({ t: 'figure-key' });
 			return true;
 		}
 		if ((key === 'Delete' || key === 'Backspace' || k === 'x') && host.hasSelection()) {

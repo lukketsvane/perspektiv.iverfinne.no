@@ -7,6 +7,7 @@
 
 import { makeFrame, project, type CameraState, type V3 } from './projection';
 import { centroid, FIGURBOKS, newId, pointInBox, type Box } from './scene';
+import { buildMannequin, type MannequinPoseName } from './mannequin';
 
 export type Rng = () => number;
 
@@ -548,13 +549,33 @@ function hovudstudie(rng: Rng): Preset {
 	return { boxes, camera };
 }
 
-// --- figurrekkje: oppstilte figurar i varierte yaw + referansekubar ---
+// --- figurrekkje: leddstilte mannekengar i varierte positurar + referansekubar ---
 function figurrekkje(rng: Rng): Preset {
 	const boxes: Box[] = [];
-	const n = ri(rng, 5, 8);
-	const x0 = (-(n - 1) / 2) * 900;
+	const poses: MannequinPoseName[] = [
+		'staande',
+		'gaande',
+		'hukande',
+		'sitgolv',
+		'boygd',
+		'vinkande',
+		'springande',
+		'lener'
+	];
+	const n = ri(rng, 4, 6);
+	const poseOff = ri(rng, 0, poses.length - 1);
+	const x0 = (-(n - 1) / 2) * 1150;
 	for (let i = 0; i < n; i++) {
-		boxes.push(figure(rng, x0 + i * 900 + r(rng, -120, 120), r(rng, -300, 300), r(rng, 0, Math.PI * 2)));
+		boxes.push(
+			...buildMannequin({
+				x: x0 + i * 1150 + r(rng, -140, 140),
+				z: r(rng, -300, 300),
+				yaw: r(rng, 0, Math.PI * 2),
+				height: ri(rng, 1620, 1880),
+				pose: poses[(i + poseOff) % poses.length],
+				jitter: rng
+			})
+		);
 	}
 	for (let i = 0; i < ri(rng, 2, 4); i++) {
 		boxes.push(bx(r(rng, -3000, 3000), 0, r(rng, 1200, 2600), 500, 500, 500, r(rng, 0, Math.PI * 2)));
@@ -1324,9 +1345,18 @@ function croquis(rng: Rng): Preset {
 	const px = r(rng, -1500, 1500);
 	boxes.push(bx(px, 0, pz, 2200, 420, 1700, r(rng, -0.08, 0.08)));
 	boxes.push(bx(px + r(rng, -300, 300), 420, pz, 430, 480, 430, r(rng, -0.3, 0.3))); // stol
-	const model = person(rng, px, pz + 100, Math.PI + r(rng, -0.25, 0.25), 'sitjande');
-	model.min[1] = 420;
-	boxes.push(model);
+	// modellen: leddstilt mannekeng sitjande på podiumsstolen
+	boxes.push(
+		...buildMannequin({
+			x: px,
+			z: pz + 100,
+			yaw: Math.PI + r(rng, -0.25, 0.25),
+			height: ri(rng, 1640, 1820),
+			pose: 'sitjande',
+			baseY: 420,
+			jitter: rng
+		})
+	);
 	if (rng() < 0.6) {
 		boxes.push(bx(px + r(rng, -400, 400), 420, pz - 300, 70, 2100, 70)); // parasollstong
 		boxes.push(bx(px + r(rng, -400, 400), 2450, pz - 300, 1500, 130, 1500, r(rng, 0, 0.8))); // duk

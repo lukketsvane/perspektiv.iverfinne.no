@@ -313,6 +313,12 @@ describe('navigasjon fyrst (v1.4): sjå er gratis, redigering kostar', () => {
 		r.engine.keyDown('b', {});
 		expect(r.has('drawmode-toggle')).toBe(true);
 	});
+
+	it('f emitterer mannekeng-handlinga (stemple/byt positur)', () => {
+		const r = rig();
+		expect(r.engine.keyDown('f', {})).toBe(true);
+		expect(r.has('figure-key')).toBe(true);
+	});
 });
 
 describe('grunn-fsm', () => {

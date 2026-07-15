@@ -7,7 +7,9 @@ export type Command =
 	| { kind: 'delete'; box: Box; index: number }
 	| { kind: 'update'; id: string; before: Box; after: Box }
 	// heil-scene-byte (preset-lasting): angrast som eitt steg
-	| { kind: 'scene'; before: Box[]; after: Box[] };
+	| { kind: 'scene'; before: Box[]; after: Box[] }
+	// fleire delkommandoar som eitt angre-steg (mannekeng-grupper)
+	| { kind: 'batch'; cmds: Command[] };
 
 export type History = { undoStack: Command[]; redoStack: Command[]; limit: number };
 
@@ -32,17 +34,26 @@ function applyForward(doc: Doc, cmd: Command): void {
 			break;
 		case 'update': {
 			const b = doc.boxes.find((x) => x.id === cmd.id);
-			if (b) {
-				b.min = [...cmd.after.min];
-				b.size = [...cmd.after.size];
-				b.yaw = cmd.after.yaw;
-			}
+			if (b) copyInto(b, cmd.after);
 			break;
 		}
 		case 'scene':
 			doc.boxes = cmd.after.map((b) => cloneBox(b, b.id));
 			break;
+		case 'batch':
+			for (const c of cmd.cmds) applyForward(doc, c);
+			break;
 	}
+}
+
+function copyInto(b: Box, src: Box): void {
+	b.min = [...src.min];
+	b.size = [...src.size];
+	b.yaw = src.yaw;
+	if (src.pitch) b.pitch = src.pitch;
+	else delete b.pitch;
+	if (src.grp) b.grp = src.grp;
+	else delete b.grp;
 }
 
 function applyBackward(doc: Doc, cmd: Command): void {
@@ -57,15 +68,14 @@ function applyBackward(doc: Doc, cmd: Command): void {
 		}
 		case 'update': {
 			const b = doc.boxes.find((x) => x.id === cmd.id);
-			if (b) {
-				b.min = [...cmd.before.min];
-				b.size = [...cmd.before.size];
-				b.yaw = cmd.before.yaw;
-			}
+			if (b) copyInto(b, cmd.before);
 			break;
 		}
 		case 'scene':
 			doc.boxes = cmd.before.map((b) => cloneBox(b, b.id));
+			break;
+		case 'batch':
+			for (let i = cmd.cmds.length - 1; i >= 0; i--) applyBackward(doc, cmd.cmds[i]);
 			break;
 	}
 }

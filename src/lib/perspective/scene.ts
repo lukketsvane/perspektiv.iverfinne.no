@@ -1,9 +1,11 @@
 // scene.ts — Box-ops (inkl. yaw), ray/golv, ray/obb, stabling (§2 treff, §3 datamodell)
 
-import { rotY, vadd, vscale, vsub, type CameraState, type V3 } from './projection';
+import { rotX, rotY, vadd, vscale, vsub, type CameraState, type V3 } from './projection';
 import { defaultCamera } from './camera';
 
-export type Box = { id: string; min: V3; size: V3; yaw: number }; // mm; yaw kring sentroid
+// mm; yaw (kring +y) og valfri pitch (kring lokal +x, etter yaw), begge kring sentroid.
+// grp bind delboksar saman til éin figur (mannekeng): flytt/rotér/slett som eining.
+export type Box = { id: string; min: V3; size: V3; yaw: number; pitch?: number; grp?: string };
 export type Ray = { origin: V3; dir: V3 };
 
 export type Settings = {
@@ -21,8 +23,8 @@ export type Settings = {
 	locked: boolean; // referanselås: ingen redigering/kamera før opplåsing
 };
 
-// versjon 2: cover vart default (v1-lagringar migrerer fit → cover ved lasting)
-export type Doc = { version: 2; boxes: Box[]; camera: CameraState; settings: Settings };
+// versjon 3: boksar kan ha pitch og grp (mannekeng); v2 var cover-default-skiftet
+export type Doc = { version: 3; boxes: Box[]; camera: CameraState; settings: Settings };
 
 export function defaultSettings(): Settings {
 	return {
@@ -42,7 +44,7 @@ export function defaultSettings(): Settings {
 }
 
 export function defaultDoc(): Doc {
-	return { version: 2, boxes: [], camera: defaultCamera(), settings: defaultSettings() };
+	return { version: 3, boxes: [], camera: defaultCamera(), settings: defaultSettings() };
 }
 export type Face = 'top' | 'bottom' | 'side';
 export type Hit = { box: Box; t: number; point: V3; normal: V3; face: Face };
@@ -72,7 +74,18 @@ export function centroid(b: Box): V3 {
 	return [b.min[0] + b.size[0] / 2, b.min[1] + b.size[1] / 2, b.min[2] + b.size[2] / 2];
 }
 
-// 8 hjørne i verdskoordinatar (yaw kring sentroid). bit0=x, bit1=z, bit2=y.
+// lokal → verd for retningar: rotY(yaw)·rotX(pitch)
+export function orientBox(v: V3, b: Box): V3 {
+	return rotY(b.pitch ? rotX(v, b.pitch) : v, b.yaw);
+}
+
+// verd → lokal: rotX(−pitch)·rotY(−yaw)
+export function unorientBox(v: V3, b: Box): V3 {
+	const r = rotY(v, -b.yaw);
+	return b.pitch ? rotX(r, -b.pitch) : r;
+}
+
+// 8 hjørne i verdskoordinatar (yaw+pitch kring sentroid). bit0=x, bit1=z, bit2=y.
 export function boxCorners(b: Box): V3[] {
 	const c = centroid(b);
 	const h: V3 = [b.size[0] / 2, b.size[1] / 2, b.size[2] / 2];
@@ -83,7 +96,7 @@ export function boxCorners(b: Box): V3[] {
 			(i & 4 ? 1 : -1) * h[1],
 			(i & 2 ? 1 : -1) * h[2]
 		];
-		out.push(vadd(c, rotY(local, b.yaw)));
+		out.push(vadd(c, orientBox(local, b)));
 	}
 	return out;
 }
@@ -129,11 +142,11 @@ export function rayPlaneY(ray: Ray, y: number): V3 | null {
 	return vadd(ray.origin, vscale(ray.dir, t));
 }
 
-// obb-treff: strålen inn i boksens lokale ramme (trekk frå sentroid, roter −yaw), så slab-test
+// obb-treff: strålen inn i boksens lokale ramme (trekk frå sentroid, inverter orientering), så slab-test
 export function rayBox(ray: Ray, b: Box): Hit | null {
 	const c = centroid(b);
-	const o = rotY(vsub(ray.origin, c), -b.yaw);
-	const d = rotY(ray.dir, -b.yaw);
+	const o = unorientBox(vsub(ray.origin, c), b);
+	const d = unorientBox(ray.dir, b);
 	const h: V3 = [b.size[0] / 2, b.size[1] / 2, b.size[2] / 2];
 
 	let tmin = -Infinity;
@@ -167,7 +180,7 @@ export function rayBox(ray: Ray, b: Box): Hit | null {
 	if (axis < 0 || tmin <= 1e-9) return null; // opphav inne i boksen: berre inngangstreff tel
 	const nLocal: V3 = [0, 0, 0];
 	nLocal[axis] = sign;
-	const normal = rotY(nLocal, b.yaw);
+	const normal = orientBox(nLocal, b);
 	const point = vadd(ray.origin, vscale(ray.dir, tmin));
 	const face: Face = axis === 1 ? (sign > 0 ? 'top' : 'bottom') : 'side';
 	return { box: b, t: tmin, point, normal, face };
@@ -176,7 +189,7 @@ export function rayBox(ray: Ray, b: Box): Hit | null {
 // er punktet inne i boksen? (til kamera-i-boks-vakta for presetar)
 export function pointInBox(p: V3, b: Box): boolean {
 	const c = centroid(b);
-	const l = rotY(vsub(p, c), -b.yaw);
+	const l = unorientBox(vsub(p, c), b);
 	return (
 		Math.abs(l[0]) <= b.size[0] / 2 &&
 		Math.abs(l[1]) <= b.size[1] / 2 &&
@@ -244,5 +257,8 @@ export function newId(): string {
 }
 
 export function cloneBox(b: Box, id?: string): Box {
-	return { id: id ?? newId(), min: [...b.min], size: [...b.size], yaw: b.yaw };
+	const out: Box = { id: id ?? newId(), min: [...b.min], size: [...b.size], yaw: b.yaw };
+	if (b.pitch) out.pitch = b.pitch;
+	if (b.grp) out.grp = b.grp;
+	return out;
 }
