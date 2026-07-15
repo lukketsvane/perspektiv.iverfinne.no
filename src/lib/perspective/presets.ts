@@ -70,7 +70,7 @@ function figure(rng: Rng, x: number, z: number, yaw: number, h = 0): Box {
 // pose-drivne bounding boxes, slik kjg teiknar dei: boksen er TETT kring posituren,
 // så proporsjonane varierer sterkt — gåande er djupe (steget), hukande er låge og
 // breie, lenande mellomting. front = lokal +z.
-export type Pose = 'staande' | 'gaande' | 'lener' | 'hukande' | 'sitjande' | 'boygd';
+export type Pose = 'staande' | 'gaande' | 'lener' | 'hukande' | 'sitjande' | 'sitgolv' | 'boygd';
 
 const POSE_DIMS: Record<Pose, [[number, number], [number, number], [number, number]]> = {
 	staande: [
@@ -97,6 +97,11 @@ const POSE_DIMS: Record<Pose, [[number, number], [number, number], [number, numb
 		[480, 560],
 		[1130, 1330],
 		[580, 720]
+	],
+	sitgolv: [
+		[560, 690],
+		[850, 1000],
+		[640, 820]
 	],
 	boygd: [
 		[540, 660],
@@ -270,7 +275,9 @@ function folkemengd(rng: Rng): Preset {
 		// barneauge inne i mengda: folk tårnar over deg
 		lookFrom(flank3(flank(1200, -750), 1020), flank3(flank(3600, 250), 1550), 235),
 		// lett drone skrått over hovuda, køen diagonalt under
-		lookFrom(flank3(flank(-1100, 2100), 3800), flank3(flank(2800, -300), 500), 235)
+		lookFrom(flank3(flank(-1100, 2100), 3800), flank3(flank(2800, -300), 500), 235),
+		// froskeblikk: liggande i gata, folk tårnar mot +y
+		lookFrom(flank3(flank(500, -550), 470), flank3(flank(3300, 250), 2100), 242)
 	]);
 	return { boxes, camera };
 }
@@ -505,7 +512,7 @@ function gate(rng: Rng): Preset {
 	const scX = r(rng, 800, 2400);
 	const scZ = busZ + r(rng, 7000, 9500);
 	boxes.push(bx(scX, 0, scZ, 700, 1100, 1900, r(rng, -0.2, 0.2)));
-	boxes.push(bx(scX, 700, scZ + 250, 500, 1250, 350, r(rng, -0.2, 0.2))); // sitjande førar
+	boxes.push(bx(scX, 700, scZ + 250, 500, 800, 380, r(rng, -0.2, 0.2))); // førar: hovud ~1.5 m
 	// nokre fotgjengarar på fortaua, dei fleste gåande
 	for (let i = 0; i < ri(rng, 1, 3); i++) {
 		const walkYaw = pick(rng, [0, Math.PI]) + r(rng, -0.2, 0.2);
@@ -568,8 +575,8 @@ function teiknekveld(rng: Rng): Preset {
 			const z = Math.sin(a) * (rad + r(rng, -180, 180));
 			boxes.push(
 				sit
-					? bx(x, 0, z, 520, r(rng, 1150, 1300), 620, Math.atan2(-x, -z))
-					: bx(x, 0, z, 500, r(rng, 1600, 1850), 300, Math.atan2(-x, -z) + r(rng, -0.2, 0.2))
+					? person(rng, x, z, Math.atan2(-x, -z), 'sitgolv')
+					: person(rng, x, z, Math.atan2(-x, -z) + r(rng, -0.2, 0.2), 'staande')
 			);
 		}
 	}
@@ -578,8 +585,10 @@ function teiknekveld(rng: Rng): Preset {
 	const camera = pick(rng, [
 		// frå gapet i ringen, ståande, mot lerretet
 		lookFrom([gx, 1650, gz], [0, 150, 0], 210),
-		// sitjande i indre ring
-		lookFrom([Math.cos(gapA + 0.7) * 2800, 1120, Math.sin(gapA + 0.7) * 2800], [0, 100, 0], 220),
+		// sitjande på golvet i indre ring
+		lookFrom([Math.cos(gapA + 0.7) * 2800, 920, Math.sin(gapA + 0.7) * 2800], [0, 100, 0], 222),
+		// målarblikket: heilt nede ved lerretkanten
+		lookFrom([Math.cos(gapA + 2.1) * 1900, 860, Math.sin(gapA + 2.1) * 1900], [0, 250, 0], 228),
 		// over skuldrene: høgt innandørs blikk
 		lookFrom([gx * 0.8, 3400, gz * 0.8], [0, 0, 0], 230)
 	]);
@@ -609,7 +618,7 @@ function interiør(rng: Rng): Preset {
 	// figurar: ståande ved servanten, hukande på golvet, sitjande mot veggen
 	boxes.push(bx(sinkX, 0, -D / 2 + 850, 500, r(rng, 1650, 1800), 300, Math.PI)); // vend mot servanten
 	boxes.push(bx(r(rng, -500, 300), 0, r(rng, 100, 700), 620, 900, 520, r(rng, 0, Math.PI * 2))); // hukande
-	if (rng() < 0.6) boxes.push(bx(-W / 2 + 650, 0, D / 2 - 700, 500, 1200, 620, Math.PI / 2)); // sitjande
+	if (rng() < 0.6) boxes.push(person(rng, -W / 2 + 700, D / 2 - 750, Math.PI / 2, 'sitgolv')); // sit på golvet
 
 	const camera = pick(rng, [
 		// frå fremre hjørne, i ståhøgd, mot servanten (romblikket i arket)
@@ -921,7 +930,7 @@ export function scorePreset(p: Preset, view = { w: 1200, h: 800 }): number {
 	const visFrac = vis / p.boxes.length;
 	const spread = ((maxX - minX) * (maxY - minY)) / (view.w * view.h);
 	const near =
-		dNear < 350 ? dNear / 350 : dNear <= 5200 ? 1 : Math.max(0, 1 - (dNear - 5200) / 5200);
+		dNear < 350 ? dNear / 350 : dNear <= 3800 ? 1 : Math.max(0, 1 - (dNear - 3800) / 4800);
 	const count = Math.min(1, vis / 6);
 	return 0.3 * visFrac + 0.25 * Math.min(1, spread / 0.32) + 0.25 * near + 0.2 * count;
 }

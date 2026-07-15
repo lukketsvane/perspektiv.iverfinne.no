@@ -229,6 +229,8 @@ budsjett: sampler + teikning < 6 ms/frame ved 200 boksar (m1 macbook / ipad pro)
 
 - **kvalitetsvakt for presetar** (v1.5): kvar `t`-lasting vert komposisjons-skåra i skjermrommet (del synlege boksar, spreiing i ramma, nærfelt 0.35–5.2 m, aldri kamera inne i ein boks) og trekt om att til skåren står seg (`buildGreatPreset`, golv 0.55); testgaranti 13 presetar × 30 seed. fire nye scener: marknad (bodar m/ stolpar+tak), containerhamn (stabla containergater + kran), byggeplass (stillasgrid, plattingar, pallar), bibliotek (hyllegater + lesekrok).
 
+- **kjg-stramming** (v1.6): shuffle-ikon direkte i verktøylinja (tilfeldig scene utan å opne arket, og utan å avsløre scenenamnet — berre namngjevne val frå arket viser namn). ny `sitgolv`-pose (hovud 0.85–1.0 m) for golv-sitjarar i teiknekveld/interiør; skuterføraren i naturleg sitjehøgd; høgdevakt-test (ingen menneskeproporsjonert boks over 2.0 m, søyler unnatekne). nærfelt-kravet i komposisjonsskåren stramma til 0.35–3.8 m (kim har alltid eit ruvande anker), og froskeblikk (0.47 m) og målarblikk (0.86 m) lagde til synspunktbanken.
+
 ## 11. opne val
 
 1. stakken i repoet: går ut frå sveltekit + ts + vitest + pnpm; stemmer det?

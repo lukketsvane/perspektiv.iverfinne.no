@@ -24,6 +24,25 @@
 <div class="bar" bind:this={el}>
 	<button
 		class="knapp"
+		class:daud={locked}
+		title="tilfeldig scene"
+		aria-label="tilfeldig scene"
+		disabled={locked}
+		onpointerdown={(e) => {
+			e.stopPropagation();
+			if (!locked) act({ t: 'preset-load', name: null });
+		}}
+	>
+		<svg viewBox="0 0 16 16" aria-hidden="true">
+			<path d="M2 4.5h2.6c1.4 0 2.3.7 3.1 1.8l.6.9c.8 1.1 1.7 1.8 3.1 1.8H13" />
+			<path d="M2 11.5h2.6c1.4 0 2.3-.7 3.1-1.8" />
+			<path d="M9.4 5.2c.8-.5 1.6-.7 2.6-.7H13" />
+			<path d="M11.4 2.9l1.8 1.6-1.8 1.6" />
+			<path d="M11.4 7.4l1.8 1.6-1.8 1.6" />
+		</svg>
+	</button>
+	<button
+		class="knapp"
 		class:aktiv={drawMode}
 		class:daud={locked}
 		title={drawMode ? 'navigasjon (b): drag ser' : 'teiknemodus (b): drag teiknar'}
