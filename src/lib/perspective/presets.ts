@@ -6,7 +6,7 @@
 // retning forankra i boksane); randomiseringa vel eitt.
 
 import { makeFrame, project, type CameraState, type V3 } from './projection';
-import { centroid, FIGURBOKS, newId, pointInBox, type Box } from './scene';
+import { centroid, newId, pointInBox, type Box } from './scene';
 import { buildMannequin, type MannequinPoseName } from './mannequin';
 
 export type Rng = () => number;
@@ -101,53 +101,14 @@ function bx(x: number, y: number, z: number, w: number, h: number, d: number, ya
 	return { id: newId(), min: [x - w / 2, y, z - d / 2], size: [w, h, d], yaw };
 }
 
-function figure(rng: Rng, x: number, z: number, yaw: number, h = 0): Box {
-	const hh = h || r(rng, 1600, 1900);
-	return bx(x, 0, z, FIGURBOKS.w, hh, FIGURBOKS.d, yaw);
+function figure(rng: Rng, x: number, z: number, yaw: number): Box[] {
+	return person(rng, x, z, yaw, 'staande');
 }
 
-// pose-drivne bounding boxes, slik kjg teiknar dei: boksen er TETT kring posituren,
-// så proporsjonane varierer sterkt — gåande er djupe (steget), hukande er låge og
-// breie, lenande mellomting. front = lokal +z.
+// alle folk er leddstilte mannekengar (v2.2): positurnamna er eit subset av
+// mannekeng-positurane; høgda varierer 1.60–1.90 m (× scale for born),
+// jitter ±3° gjev naturleg variasjon i rekkjer og mengder. front = lokal +z.
 export type Pose = 'staande' | 'gaande' | 'lener' | 'hukande' | 'sitjande' | 'sitgolv' | 'boygd';
-
-const POSE_DIMS: Record<Pose, [[number, number], [number, number], [number, number]]> = {
-	staande: [
-		[460, 560],
-		[1620, 1900],
-		[260, 340]
-	],
-	gaande: [
-		[480, 580],
-		[1580, 1800],
-		[560, 780]
-	],
-	lener: [
-		[500, 620],
-		[1320, 1550],
-		[480, 680]
-	],
-	hukande: [
-		[580, 700],
-		[880, 1120],
-		[540, 720]
-	],
-	sitjande: [
-		[480, 560],
-		[1130, 1330],
-		[580, 720]
-	],
-	sitgolv: [
-		[560, 690],
-		[850, 1000],
-		[640, 820]
-	],
-	boygd: [
-		[540, 660],
-		[980, 1260],
-		[680, 900]
-	]
-};
 
 function weightedPose(rng: Rng, weights: Array<[Pose, number]>): Pose {
 	let sum = 0;
@@ -160,9 +121,24 @@ function weightedPose(rng: Rng, weights: Array<[Pose, number]>): Pose {
 	return weights[weights.length - 1][0];
 }
 
-function person(rng: Rng, x: number, z: number, yaw: number, pose: Pose, scale = 1): Box {
-	const [[w0, w1], [h0, h1], [d0, d1]] = POSE_DIMS[pose];
-	return bx(x, 0, z, r(rng, w0, w1) * scale, r(rng, h0, h1) * scale, r(rng, d0, d1) * scale, yaw);
+function person(
+	rng: Rng,
+	x: number,
+	z: number,
+	yaw: number,
+	pose: MannequinPoseName,
+	scale = 1,
+	baseY = 0
+): Box[] {
+	return buildMannequin({
+		x,
+		z,
+		yaw,
+		height: Math.round(r(rng, 1600, 1900) * scale),
+		pose,
+		baseY,
+		jitter: rng
+	});
 }
 
 // hund: kropp + hovud (to boksar), som hestane
@@ -225,7 +201,7 @@ function folkemengd(rng: Rng): Preset {
 		const perp: [number, number] = [-dir[1], dir[0]];
 		const ox = r(rng, -1800, 1800) + sI * 1500;
 		const oz = r(rng, -1500, 1500) - sI * 1200;
-		const count = nStreams === 1 ? ri(rng, 7, 10) : ri(rng, 5, 8);
+		const count = nStreams === 1 ? ri(rng, 5, 7) : ri(rng, 4, 5);
 		const walkYaw = Math.atan2(dir[0], dir[1]); // front (+z lokalt) i gangretninga
 		if (sI === 0) anchor = { pos: [ox, oz], dir };
 		let along = 0;
@@ -241,12 +217,12 @@ function folkemengd(rng: Rng): Preset {
 				['boygd', 1]
 			]);
 			const scale = rng() < 0.12 ? r(rng, 0.6, 0.72) : 1; // born i fylgje
-			boxes.push(person(rng, x, z, walkYaw + r(rng, -0.22, 0.22), pose, scale));
+			boxes.push(...person(rng, x, z, walkYaw + r(rng, -0.22, 0.22), pose, scale));
 			// følgjesven side om side (arket har par i køen)
-			if (rng() < 0.3) {
+			if (rng() < 0.22) {
 				const side = rng() < 0.5 ? 1 : -1;
 				boxes.push(
-					person(
+					...person(
 						rng,
 						x + perp[0] * 520 * side,
 						z + perp[1] * 520 * side,
@@ -276,14 +252,14 @@ function folkemengd(rng: Rng): Preset {
 	{
 		const [px, pz] = flank(r(rng, 800, 3800), (rng() < 0.5 ? 1 : -1) * r(rng, 1500, 2600));
 		const pairA = r(rng, 0, Math.PI * 2);
-		boxes.push(person(rng, px, pz, pairA, 'staande'));
+		boxes.push(...person(rng, px, pz, pairA, 'staande'));
 		boxes.push(
-			person(rng, px + Math.sin(pairA) * 750, pz + Math.cos(pairA) * 750, pairA + Math.PI, rng() < 0.5 ? 'staande' : 'lener')
+			...person(rng, px + Math.sin(pairA) * 750, pz + Math.cos(pairA) * 750, pairA + Math.PI, rng() < 0.5 ? 'staande' : 'lener')
 		);
 	}
 
 	// lausfolk: sitjande på kasse, hukande, bøygd — vekselvis side
-	for (let i = 0; i < ri(rng, 2, 3); i++) {
+	for (let i = 0; i < 2; i++) {
 		const side = (i % 2 === 0 ? 1 : -1) * r(rng, 1300, 3000);
 		const [x, z] = flank(r(rng, 300, 4600), side);
 		const yaw = r(rng, 0, Math.PI * 2);
@@ -294,12 +270,9 @@ function folkemengd(rng: Rng): Preset {
 		]);
 		if (pose === 'sitjande') {
 			boxes.push(bx(x, 0, z, 520, 440, 520, yaw)); // kassa
-			const b = person(rng, x, z, yaw, 'sitjande');
-			b.min[1] = 440; // opp på kassa
-			b.size[1] -= 440;
-			boxes.push(b);
+			boxes.push(...person(rng, x, z, yaw, 'sitjande')); // bekkenet landar på kassekanten
 		} else {
-			boxes.push(person(rng, x, z, yaw, pose));
+			boxes.push(...person(rng, x, z, yaw, pose));
 		}
 	}
 
@@ -346,11 +319,11 @@ function klasserom(rng: Rng): Preset {
 			if (cI === cols - 1 && rowI === rows - 1) deskPos = [x, z];
 			if (rng() < 0.75) {
 				boxes.push(bx(x, 0, z + 500, 400, 430, 400, yaw)); // stol
-				if (rng() < 0.6) boxes.push(bx(x, 0, z + 480, 430, 1250, 550, yaw)); // sitjande elev
+				if (rng() < 0.6) boxes.push(...person(rng, x, z + 490, yaw + Math.PI, 'sitjande', r(rng, 0.78, 0.92))); // sitjande elev
 			}
 			if (rng() < 0.18) {
 				boxes.push(
-					bx(x + r(rng, 500, 700), 0, z + r(rng, -200, 200), 400, r(rng, 1250, 1450), 250, r(rng, 0, Math.PI * 2))
+					...person(rng, x + r(rng, 500, 700), z + r(rng, -200, 200), r(rng, 0, Math.PI * 2), 'staande', r(rng, 0.72, 0.85))
 				);
 			}
 		}
@@ -358,7 +331,7 @@ function klasserom(rng: Rng): Preset {
 	const tz = z0 - 1900;
 	const teacherX = r(rng, -1600, 1600);
 	boxes.push(bx(r(rng, -800, 800), 0, tz, 1400, 760, 700, r(rng, -0.1, 0.1))); // kateter
-	boxes.push(figure(rng, teacherX, tz + r(rng, -300, 300), r(rng, 2.6, 3.7))); // lærar
+	boxes.push(...figure(rng, teacherX, tz + r(rng, -300, 300), r(rng, 2.6, 3.7))); // lærar
 
 	const camera = pick(rng, [
 		// sitjande elev bakarst: pulthøgd-perspektivet
@@ -415,7 +388,7 @@ function verkstad(rng: Rng): Preset {
 		else boxes.push(bx(x, 0, z, 1300, 1600, 900, yaw)); // maskin
 		if (rng() < 0.3) {
 			boxes.push(
-				person(
+				...person(
 					rng,
 					x + r(rng, 700, 1100),
 					z + r(rng, -400, 400),
@@ -475,7 +448,7 @@ function stall(rng: Rng): Preset {
 	}
 	for (let i = 0; i < ri(rng, 1, 2); i++) {
 		boxes.push(
-			person(
+			...person(
 				rng,
 				r(rng, -3000, 3000),
 				r(rng, -2200, 2200),
@@ -528,7 +501,7 @@ function hovudstudie(rng: Rng): Preset {
 		boxes.push(bx(x, ph, z, 230, 290, 250, r(rng, 0, Math.PI * 2))); // hovud
 		if (i === 0) topHead = [x, ph + 145, z];
 	}
-	boxes.push(person(rng, r(rng, -2400, 2400), r(rng, 1800, 2600), r(rng, 2.4, 3.9), 'staande'));
+	boxes.push(...person(rng, r(rng, -2400, 2400), r(rng, 1800, 2600), r(rng, 2.4, 3.9), 'staande'));
 	// studioklutter: arbeidsbord med verktøy og krakk bak sokklane
 	const tbx = r(rng, -2600, 2600);
 	const tbz = r(rng, -2600, -2100);
@@ -589,7 +562,7 @@ function figurrekkje(rng: Rng): Preset {
 	const tw = Math.atan2(-ax, -az);
 	boxes.push(bx(ax, 450, az, 720, 1300, 90, tw)); // staffeliplate
 	boxes.push(bx(ax - Math.sin(tw) * 260, 0, az - Math.cos(tw) * 260, 80, 1800, 80, tw)); // støttestolpe
-	boxes.push(person(rng, ax - Math.sin(tw) * 700, az - Math.cos(tw) * 700, tw, 'staande'));
+	boxes.push(...person(rng, ax - Math.sin(tw) * 700, az - Math.cos(tw) * 700, tw, 'staande'));
 	const camera = pick(rng, [
 		// klassisk: ståande rett framfor rekkja
 		lookFrom([0, 1780, 3200], [0, 1300, 0], 220),
@@ -631,13 +604,14 @@ function gate(rng: Rng): Preset {
 	// skuter med førar
 	const scX = r(rng, 800, 2400);
 	const scZ = busZ + r(rng, 7000, 9500);
-	boxes.push(bx(scX, 0, scZ, 700, 1100, 1900, r(rng, -0.2, 0.2)));
-	boxes.push(bx(scX, 700, scZ + 250, 500, 800, 380, r(rng, -0.2, 0.2))); // førar: hovud ~1.5 m
+	const scYaw = r(rng, -0.2, 0.2);
+	boxes.push(bx(scX, 0, scZ, 700, 1100, 1900, scYaw));
+	boxes.push(...person(rng, scX, scZ + 150, scYaw, 'sitjande', 1, 250)); // førar i salen
 	// nokre fotgjengarar på fortaua, dei fleste gåande
 	for (let i = 0; i < ri(rng, 1, 3); i++) {
 		const walkYaw = pick(rng, [0, Math.PI]) + r(rng, -0.2, 0.2);
 		boxes.push(
-			person(
+			...person(
 				rng,
 				pick(rng, [-1, 1]) * r(rng, 3200, 3900),
 				busZ + r(rng, -7000, 8000),
@@ -678,27 +652,27 @@ function teiknekveld(rng: Rng): Preset {
 		boxes.push(bx(Math.cos(a) * rad, 0, Math.sin(a) * rad, 280, 330, 280, r(rng, 0, 1)));
 	}
 	// hukande kunstnarar ved lerretkanten, vende mot midten
-	for (let i = 0; i < ri(rng, 2, 4); i++) {
+	for (let i = 0; i < ri(rng, 2, 3); i++) {
 		const a = r(rng, 0, Math.PI * 2);
 		const rad = r(rng, 1400, 1900);
 		const x = Math.cos(a) * rad;
 		const z = Math.sin(a) * rad;
-		boxes.push(bx(x, 0, z, 650, 950, 550, Math.atan2(-x, -z)));
+		boxes.push(...person(rng, x, z, Math.atan2(-x, -z), 'hukande'));
 	}
 	// publikum: indre ring sit, ytre står; ope gap for blikket
 	const gapA = r(rng, 0, Math.PI * 2);
 	for (const [rad, sit, count] of [
-		[2900, true, ri(rng, 8, 11)],
-		[3700, false, ri(rng, 9, 13)]
+		[2900, true, ri(rng, 6, 8)],
+		[3700, false, ri(rng, 7, 9)]
 	] as Array<[number, boolean, number]>) {
 		for (let i = 0; i < count; i++) {
 			const a = gapA + 0.5 + (i / count) * (Math.PI * 2 - 1.0) + r(rng, -0.06, 0.06);
 			const x = Math.cos(a) * (rad + r(rng, -180, 180));
 			const z = Math.sin(a) * (rad + r(rng, -180, 180));
 			boxes.push(
-				sit
+				...(sit
 					? person(rng, x, z, Math.atan2(-x, -z), 'sitgolv')
-					: person(rng, x, z, Math.atan2(-x, -z) + r(rng, -0.2, 0.2), 'staande')
+					: person(rng, x, z, Math.atan2(-x, -z) + r(rng, -0.2, 0.2), 'staande'))
 			);
 		}
 	}
@@ -738,9 +712,9 @@ function interiør(rng: Rng): Preset {
 	boxes.push(bx(-W / 2 + 400, 0, r(rng, -200, 300), 760, 560, 1700, 0)); // badekar langs venstre
 	boxes.push(bx(W / 2 - 220, 0, D / 2 - 500, 320, r(rng, 1300, 1800), 320, 0)); // hylle i hjørnet
 	// figurar: ståande ved servanten, hukande på golvet, sitjande mot veggen
-	boxes.push(bx(sinkX, 0, -D / 2 + 850, 500, r(rng, 1650, 1800), 300, Math.PI)); // vend mot servanten
-	boxes.push(bx(r(rng, -500, 300), 0, r(rng, 100, 700), 620, 900, 520, r(rng, 0, Math.PI * 2))); // hukande
-	if (rng() < 0.6) boxes.push(person(rng, -W / 2 + 700, D / 2 - 750, Math.PI / 2, 'sitgolv')); // sit på golvet
+	boxes.push(...person(rng, sinkX, -D / 2 + 850, Math.PI, 'staande')); // vend mot servanten
+	boxes.push(...person(rng, r(rng, -500, 300), r(rng, 100, 700), r(rng, 0, Math.PI * 2), 'hukande'));
+	if (rng() < 0.6) boxes.push(...person(rng, -W / 2 + 700, D / 2 - 750, Math.PI / 2, 'sitgolv')); // sit på golvet
 
 	const camera = pick(rng, [
 		// frå fremre hjørne, i ståhøgd, mot servanten (romblikket i arket)
@@ -786,7 +760,7 @@ function marknad(rng: Rng): Preset {
 			if (rng() < 0.5) boxes.push(bx(x + dir[0] * 900, 0, z + dir[1] * 900, 500, 420, 400, yaw + r(rng, -0.4, 0.4)));
 			// seljar bak bordet
 			boxes.push(
-				person(rng, x - dir[0] * 900, z - dir[1] * 900, Math.atan2(dir[0], dir[1]) + r(rng, -0.2, 0.2), weightedPose(rng, [
+				...person(rng, x - dir[0] * 900, z - dir[1] * 900, Math.atan2(dir[0], dir[1]) + r(rng, -0.2, 0.2), weightedPose(rng, [
 					['staande', 2],
 					['lener', 2],
 					['boygd', 1]
@@ -796,10 +770,10 @@ function marknad(rng: Rng): Preset {
 	}
 	// kundar i midtgangen
 	const walkDir = rng() < 0.5 ? 0 : Math.PI;
-	for (let i = 0; i < ri(rng, 3, 5); i++) {
+	for (let i = 0; i < ri(rng, 2, 4); i++) {
 		const z = z0 + r(rng, -800, (nPerSide - 1) * pitch + 800);
 		boxes.push(
-			person(rng, r(rng, -1100, 1100), z, walkDir + r(rng, -0.5, 0.5), weightedPose(rng, [
+			...person(rng, r(rng, -1100, 1100), z, walkDir + r(rng, -0.5, 0.5), weightedPose(rng, [
 				['gaande', 3],
 				['staande', 2],
 				['lener', 1]
@@ -853,7 +827,7 @@ function containerhamn(rng: Rng): Preset {
 	// hamnearbeidarar i gata
 	for (let i = 0; i < ri(rng, 1, 3); i++) {
 		boxes.push(
-			person(rng, x0 + (C[0] + gate) / 2 + r(rng, -900, 900), z0 + r(rng, 0, (perRow - 1) * (C[2] + 900)), r(rng, 0, Math.PI * 2), weightedPose(rng, [
+			...person(rng, x0 + (C[0] + gate) / 2 + r(rng, -900, 900), z0 + r(rng, 0, (perRow - 1) * (C[2] + 900)), r(rng, 0, Math.PI * 2), weightedPose(rng, [
 				['gaande', 2],
 				['staande', 2],
 				['boygd', 1]
@@ -910,19 +884,21 @@ function byggeplass(rng: Rng): Preset {
 			boxes.push(bx(x0 + cI * gx + gx / 2, y + 60, 0, gx, 70, gz + 400)); // platting
 			if (rng() < 0.6) {
 				// arbeidar oppå plattinga
-				const worker = person(
-					rng,
-					x0 + cI * gx + gx / 2 + r(rng, -500, 500),
-					r(rng, -600, 600),
-					r(rng, 0, Math.PI * 2),
-					weightedPose(rng, [
-						['boygd', 2],
-						['hukande', 2],
-						['staande', 1]
-					])
+				boxes.push(
+					...person(
+						rng,
+						x0 + cI * gx + gx / 2 + r(rng, -500, 500),
+						r(rng, -600, 600),
+						r(rng, 0, Math.PI * 2),
+						weightedPose(rng, [
+							['boygd', 2],
+							['hukande', 2],
+							['staande', 1]
+						]),
+						1,
+						y + 130
+					)
 				);
-				worker.min[1] = y + 130;
-				boxes.push(worker);
 			}
 		}
 	}
@@ -937,7 +913,7 @@ function byggeplass(rng: Rng): Preset {
 	// arbeidarar på bakken
 	for (let i = 0; i < ri(rng, 2, 3); i++) {
 		boxes.push(
-			person(rng, r(rng, x0 - 1800, x0 + cols * gx + 600), r(rng, -3000, 3000), r(rng, 0, Math.PI * 2), weightedPose(rng, [
+			...person(rng, r(rng, x0 - 1800, x0 + cols * gx + 600), r(rng, -3000, 3000), r(rng, 0, Math.PI * 2), weightedPose(rng, [
 				['boygd', 2],
 				['hukande', 1],
 				['gaande', 2],
@@ -975,7 +951,7 @@ function bibliotek(rng: Rng): Preset {
 	for (let i = 0; i < ri(rng, 2, 4); i++) {
 		const lane = ri(rng, 0, rowsN - 2);
 		boxes.push(
-			person(rng, x0 + lane * pitch + pitch / 2 + r(rng, -220, 220), z0 + r(rng, 0, segs * segL), rng() < 0.5 ? Math.PI / 2 : -Math.PI / 2, weightedPose(rng, [
+			...person(rng, x0 + lane * pitch + pitch / 2 + r(rng, -220, 220), z0 + r(rng, 0, segs * segL), rng() < 0.5 ? Math.PI / 2 : -Math.PI / 2, weightedPose(rng, [
 				['staande', 3],
 				['lener', 2],
 				['hukande', 1]
@@ -989,8 +965,7 @@ function bibliotek(rng: Rng): Preset {
 		const yaw = r(rng, -0.2, 0.2);
 		boxes.push(bx(tx, 0, tz, 1600, 750, 900, yaw));
 		boxes.push(bx(tx - 500, 0, tz + 800, 420, 450, 420, yaw));
-		const reader = person(rng, tx - 500, tz + 780, yaw + Math.PI, 'sitjande');
-		boxes.push(reader);
+		boxes.push(...person(rng, tx - 500, tz + 780, yaw + Math.PI, 'sitjande'));
 		if (rng() < 0.6) boxes.push(bx(tx + r(rng, -300, 300), 750, tz + r(rng, -200, 200), 350, 60, 250, r(rng, 0, 0.5))); // open bok
 	}
 	const camera = pick(rng, [
@@ -1073,14 +1048,12 @@ function karavane(rng: Rng): Preset {
 		const kind = ri(rng, 0, 2);
 		const mount = kind === 0 ? kamel(rng, x, z, walkYaw + r(rng, -0.15, 0.15)) : kind === 1 ? struts(rng, x, z, walkYaw + r(rng, -0.15, 0.15)) : hestMount(rng, x, z, walkYaw + r(rng, -0.15, 0.15));
 		boxes.push(...mount.boxes);
-		// ryttar: sit nedi dyret (sitgolv-proporsjonar over setet)
-		const rider = person(rng, x, z, walkYaw + r(rng, -0.2, 0.2), 'sitgolv');
-		rider.min[1] = mount.topY - 120;
-		boxes.push(rider);
+		// ryttar: sit nedi dyret (falda bein over ryggen)
+		boxes.push(...person(rng, x, z, walkYaw + r(rng, -0.2, 0.2), 'sitgolv', 1, mount.topY - 150));
 	}
 	// gjetarar til fots + geiteflokk
 	for (let i = 0; i < ri(rng, 1, 2); i++) {
-		boxes.push(person(rng, ox + dir[0] * r(rng, 800, along) + perp[0] * r(rng, 900, 1600) * (rng() < 0.5 ? 1 : -1), oz + dir[1] * r(rng, 800, along) + perp[1] * r(rng, 900, 1600) * (rng() < 0.5 ? 1 : -1), walkYaw + r(rng, -0.3, 0.3), 'gaande'));
+		boxes.push(...person(rng, ox + dir[0] * r(rng, 800, along) + perp[0] * r(rng, 900, 1600) * (rng() < 0.5 ? 1 : -1), oz + dir[1] * r(rng, 800, along) + perp[1] * r(rng, 900, 1600) * (rng() < 0.5 ? 1 : -1), walkYaw + r(rng, -0.3, 0.3), 'gaande'));
 	}
 	for (let i = 0; i < ri(rng, 2, 5); i++) {
 		const gAlong = r(rng, 600, Math.max(1200, along));
@@ -1111,13 +1084,13 @@ function konsert(rng: Rng): Preset {
 	boxes.push(bx(0, 0, -2600, stageW, 620, 3600)); // scenegolv
 	// band på scena
 	for (let i = 0; i < ri(rng, 3, 4); i++) {
-		const m = person(rng, r(rng, -stageW / 2 + 700, stageW / 2 - 700), r(rng, -3600, -1900), Math.PI + r(rng, -0.4, 0.4), weightedPose(rng, [
-			['staande', 3],
-			['lener', 2],
-			['boygd', 1]
-		]));
-		m.min[1] = 620;
-		boxes.push(m);
+		boxes.push(
+			...person(rng, r(rng, -stageW / 2 + 700, stageW / 2 - 700), r(rng, -3600, -1900), Math.PI + r(rng, -0.4, 0.4), weightedPose(rng, [
+				['staande', 3],
+				['lener', 2],
+				['boygd', 1]
+			]), 1, 620)
+		);
 	}
 	// forsterkarar og monitorwedgar
 	for (const sx of [-1, 1]) {
@@ -1140,17 +1113,17 @@ function konsert(rng: Rng): Preset {
 	const rows = ri(rng, 2, 3);
 	for (let rI = 0; rI < rows; rI++) {
 		const rad = 2400 + rI * 1150;
-		const count = 6 + rI * 3;
+		const count = 4 + rI * 2;
 		for (let i = 0; i < count; i++) {
 			const a = -Math.PI / 2 + ((i + 0.5) / count - 0.5) * 1.9;
 			const x = Math.cos(a) * rad;
 			const z = -2600 + Math.sin(a) * rad * -1 + 2600 + Math.sin(a) * 0; // boge mot scena
 			const px = x + r(rng, -180, 180);
 			const pz = 700 + rI * 1150 + Math.abs(x) * 0.12 + r(rng, -250, 250);
-			boxes.push(person(rng, px, pz, Math.PI + r(rng, -0.25, 0.25), rng() < 0.8 ? 'staande' : 'gaande'));
+			boxes.push(...person(rng, px, pz, Math.PI + r(rng, -0.25, 0.25), rng() < 0.8 ? 'staande' : 'gaande'));
 			// barn på skuldrene
 			if (rI === rows - 1 && rng() < 0.12) {
-				boxes.push(bx(px, 1780, pz, 360, 780, 240, Math.PI + r(rng, -0.3, 0.3)));
+				boxes.push(...person(rng, px, pz, Math.PI + r(rng, -0.3, 0.3), 'sitgolv', r(rng, 0.5, 0.6), 1620));
 			}
 		}
 	}
@@ -1185,15 +1158,13 @@ function perrong(rng: Rng): Preset {
 		const bz = r(rng, -span / 2 + 1200, span / 2 - 1200);
 		boxes.push(bx(2600, 0, bz, 600, 450, 1750, 0));
 		if (rng() < 0.8) {
-			const sitter = person(rng, 2600, bz + r(rng, -450, 450), -Math.PI / 2, 'sitgolv');
-			sitter.min[1] = 450;
-			boxes.push(sitter);
+			boxes.push(...person(rng, 2600, bz + r(rng, -450, 450), -Math.PI / 2, 'sitjande')); // på benken
 		}
 	}
 	for (let i = 0; i < ri(rng, 5, 7); i++) {
 		const pz = r(rng, -span / 2, span / 2);
 		const px = r(rng, -1100, 1100);
-		boxes.push(person(rng, px, pz, r(rng, 0, Math.PI * 2), weightedPose(rng, [
+		boxes.push(...person(rng, px, pz, r(rng, 0, Math.PI * 2), weightedPose(rng, [
 			['staande', 3],
 			['gaande', 2],
 			['lener', 1]
@@ -1245,7 +1216,7 @@ function kjøkken(rng: Rng): Preset {
 	for (let i = 0; i < ri(rng, 2, 4); i++) {
 		const sx = rng() < 0.5 ? -1 : 1;
 		boxes.push(
-			person(rng, sx * (aisle / 2 - 260), r(rng, -runL / 2 + 500, runL / 2 - 500), sx < 0 ? -Math.PI / 2 : Math.PI / 2, weightedPose(rng, [
+			...person(rng, sx * (aisle / 2 - 260), r(rng, -runL / 2 + 500, runL / 2 - 500), sx < 0 ? -Math.PI / 2 : Math.PI / 2, weightedPose(rng, [
 				['boygd', 3],
 				['staande', 2],
 				['hukande', 1]
@@ -1296,9 +1267,7 @@ function kontor(rng: Rng): Preset {
 			}
 			if (rng() < 0.7) {
 				boxes.push(bx(px - dir[0] * 750 * b, 0, pz - dir[1] * 750 * b, 420, 450, 420, yaw)); // stol
-				const worker = person(rng, px - dir[0] * 720 * b, pz - dir[1] * 720 * b, b > 0 ? yaw : yaw + Math.PI, 'sitgolv');
-				worker.min[1] = 430;
-				boxes.push(worker);
+				boxes.push(...person(rng, px - dir[0] * 720 * b, pz - dir[1] * 720 * b, b > 0 ? yaw : yaw + Math.PI, 'sitjande'));
 			}
 		}
 		boxes.push(bx(cx, 0, cz, 60, 1350, 1900, yaw)); // skiljevegg midt i øya
@@ -1308,10 +1277,10 @@ function kontor(rng: Rng): Preset {
 	boxes.push(bx(0, 0, mz, 2400, 740, 1100, r(rng, -0.1, 0.1)));
 	for (let i = 0; i < ri(rng, 2, 4); i++) {
 		const sx = rng() < 0.5 ? -1 : 1;
-		const sitter = person(rng, r(rng, -900, 900), mz + sx * 850, sx > 0 ? Math.PI : 0, 'sitgolv');
-		sitter.min[1] = 430;
-		boxes.push(bx(sitter.min[0] + sitter.size[0] / 2, 0, sitter.min[2] + sitter.size[2] / 2, 420, 450, 420));
-		boxes.push(sitter);
+		const sxp2 = r(rng, -900, 900);
+		const szp2 = mz + sx * 850;
+		boxes.push(bx(sxp2, 0, szp2, 420, 450, 420));
+		boxes.push(...person(rng, sxp2, szp2, sx > 0 ? Math.PI : 0, 'sitjande'));
 	}
 	// planter og tavle
 	for (let i = 0; i < ri(rng, 1, 3); i++) {
@@ -1363,8 +1332,8 @@ function croquis(rng: Rng): Preset {
 	}
 	// to bogar av staffeli: fremre sit, bakre står
 	for (const [rad, sitRow, count] of [
-		[3100, true, ri(rng, 5, 7)],
-		[4600, false, ri(rng, 6, 8)]
+		[3100, true, ri(rng, 4, 5)],
+		[4600, false, ri(rng, 5, 6)]
 	] as Array<[number, boolean, number]>) {
 		for (let i = 0; i < count; i++) {
 			const a = Math.PI / 2 + ((i + 0.5) / count - 0.5) * 1.75 + r(rng, -0.05, 0.05);
@@ -1380,9 +1349,9 @@ function croquis(rng: Rng): Preset {
 			const azp = ez - Math.cos(toward) * 640;
 			if (sitRow) {
 				boxes.push(bx(axp, 0, azp, 360, 440, 360, toward)); // krakk
-				boxes.push(person(rng, axp, azp - 60, toward, 'sitjande'));
+				boxes.push(...person(rng, axp, azp - 60, toward, 'sitjande'));
 			} else {
-				boxes.push(person(rng, axp, azp, toward, weightedPose(rng, [
+				boxes.push(...person(rng, axp, azp, toward, weightedPose(rng, [
 					['staande', 3],
 					['lener', 1]
 				])));
@@ -1436,16 +1405,16 @@ function matbar(rng: Rng): Preset {
 		const gz = r(rng, -L / 2 + 700, L / 2 - 700);
 		const facing = sx < 0 ? -Math.PI / 2 : Math.PI / 2;
 		if (rng() < 0.55) {
-			boxes.push(person(rng, sx * (half - 290), gz, facing, 'lener')); // heilt inntil disken
+			boxes.push(...person(rng, sx * (half - 290), gz, facing, 'lener')); // heilt inntil disken
 		} else {
 			boxes.push(bx(sx * (half - 300), 0, gz, 320, 460, 320)); // krakk
-			boxes.push(person(rng, sx * (half - 330), gz - 40, facing, 'sitjande'));
+			boxes.push(...person(rng, sx * (half - 330), gz - 40, facing, 'sitjande'));
 		}
 		if (rng() < 0.3) boxes.push(bx(sx * (half - 420), 0, gz + r(rng, 350, 550), 340, 430, 270, r(rng, 0, Math.PI * 2))); // sekk på golvet
 	}
-	boxes.push(person(rng, (rng() < 0.5 ? -1 : 1) * (half + 250), r(rng, -L / 3, L / 3), rng() < 0.5 ? Math.PI / 2 : -Math.PI / 2, 'boygd')); // kokk bak disken
+	boxes.push(...person(rng, (rng() < 0.5 ? -1 : 1) * (half + 250), r(rng, -L / 3, L / 3), rng() < 0.5 ? Math.PI / 2 : -Math.PI / 2, 'boygd')); // kokk bak disken
 	// éin gåande i gata
-	boxes.push(person(rng, r(rng, -250, 250), r(rng, -L / 4, L / 4), (rng() < 0.5 ? 0 : Math.PI) + r(rng, -0.2, 0.2), 'gaande'));
+	boxes.push(...person(rng, r(rng, -250, 250), r(rng, -L / 4, L / 4), (rng() < 0.5 ? 0 : Math.PI) + r(rng, -0.2, 0.2), 'gaande'));
 	const camera = pick(rng, [
 		// ståande i den tronge gata (arkets blikk)
 		lookFrom([r(rng, -200, 200), 1580, L / 2 + 900], [r(rng, -300, 300), 1150, -L / 2], 232),
@@ -1471,9 +1440,7 @@ function sirkus(rng: Rng): Preset {
 	const podX = r(rng, -700, 700);
 	const podZ = r(rng, -700, 700);
 	boxes.push(bx(podX, 0, podZ, 850, 650, 850, r(rng, 0, 0.6)));
-	const artist = person(rng, podX, podZ, r(rng, 0, Math.PI * 2), 'staande');
-	artist.min[1] = 650;
-	boxes.push(artist);
+	boxes.push(...person(rng, podX, podZ, r(rng, 0, Math.PI * 2), 'vinkande', 1, 650)); // artist helsar
 	// elefant med ryttar, tangentielt rundt manesjen
 	const ea = r(rng, 0, Math.PI * 2);
 	const eR = ringR * 0.58;
@@ -1495,9 +1462,7 @@ function sirkus(rng: Rng): Preset {
 	}
 	boxes.push(bx(ex + edir[0] * 1650, 1900, ez + edir[1] * 1650, 620, 780, 650, eyaw + r(rng, -0.2, 0.2))); // hovud
 	boxes.push(bx(ex + edir[0] * 2120, 900, ez + edir[1] * 2120, 220, 1080, 220, eyaw)); // snabel
-	const rider = person(rng, ex - edir[0] * 300, ez - edir[1] * 300, eyaw, 'sitgolv');
-	rider.min[1] = 2800;
-	boxes.push(rider);
+	boxes.push(...person(rng, ex - edir[0] * 300, ez - edir[1] * 300, eyaw, 'sitgolv', 1, 2800)); // ryttar på elefanten
 	// tribune: to sektorar med benkerader i trapp, publikum vend mot manesjen
 	const tribA0 = r(rng, 0, Math.PI * 2);
 	for (const sector of [0, 1]) {
@@ -1512,9 +1477,10 @@ function sirkus(rng: Rng): Preset {
 				for (let pI = 0; pI < ri(rng, 1, 2); pI++) {
 					const off = r(rng, -800, 800);
 					const tang: [number, number] = [-Math.sin(a), Math.cos(a)];
-					const sp = person(rng, bxp + tang[0] * off, bzp + tang[1] * off, Math.atan2(-bxp, -bzp) + r(rng, -0.2, 0.2), 'sitgolv');
-					sp.min[1] = row * 480 + 420;
-					boxes.push(sp);
+					// sitjande på benken: føtene på tribunetrinnet, bekkenet på benkekanten
+					boxes.push(
+						...person(rng, bxp + tang[0] * off, bzp + tang[1] * off, Math.atan2(-bxp, -bzp) + r(rng, -0.2, 0.2), 'sitjande', 1, row * 480)
+					);
 				}
 			}
 		}
@@ -1582,14 +1548,14 @@ function hamnekai(rng: Rng): Preset {
 	boxes.push(bx(kaiX - 300, 0, dvZ, 300, 3400, 300));
 	boxes.push(bx(kaiX + 500, 3200, dvZ, 1900, 200, 200));
 	// fiskarar: bøygd over kassane, samtalepar, gåande, hukande ved pullerten
-	boxes.push(person(rng, kaiX - r(rng, 1600, 2400), bz + r(rng, -1200, 1200), r(rng, 0, Math.PI * 2), 'boygd'));
+	boxes.push(...person(rng, kaiX - r(rng, 1600, 2400), bz + r(rng, -1200, 1200), r(rng, 0, Math.PI * 2), 'boygd'));
 	const cpx = kaiX - r(rng, 3000, 4200);
 	const cpz = bz + r(rng, 2000, 4500);
 	const ca = r(rng, 0, Math.PI * 2);
-	boxes.push(person(rng, cpx, cpz, ca, 'staande'));
-	boxes.push(person(rng, cpx + Math.sin(ca) * 780, cpz + Math.cos(ca) * 780, ca + Math.PI, rng() < 0.5 ? 'staande' : 'lener'));
-	boxes.push(person(rng, kaiX - r(rng, 1000, 2000), bz - r(rng, 3000, 5500), r(rng, 0, Math.PI * 2), 'gaande'));
-	if (rng() < 0.6) boxes.push(person(rng, kaiX - 700, bz + r(rng, -5500, 5500), r(rng, 0, Math.PI * 2), 'hukande'));
+	boxes.push(...person(rng, cpx, cpz, ca, 'staande'));
+	boxes.push(...person(rng, cpx + Math.sin(ca) * 780, cpz + Math.cos(ca) * 780, ca + Math.PI, rng() < 0.5 ? 'staande' : 'lener'));
+	boxes.push(...person(rng, kaiX - r(rng, 1000, 2000), bz - r(rng, 3000, 5500), r(rng, 0, Math.PI * 2), 'gaande'));
+	if (rng() < 0.6) boxes.push(...person(rng, kaiX - 700, bz + r(rng, -5500, 5500), r(rng, 0, Math.PI * 2), 'hukande'));
 	if (rng() < 0.4) boxes.push(...dog(rng, kaiX - r(rng, 2000, 3500), bz + r(rng, -4000, 4000), r(rng, 0, Math.PI * 2)));
 	const camera = pick(rng, [
 		// på kaia tett ved skroget: stålveggen ruvar over hovudet
@@ -1620,10 +1586,8 @@ function leikeplass(rng: Rng): Preset {
 	}
 	for (let j = 0; j < 3; j++) boxes.push(bx(kx, 1900, kz + (j - 1) * g, 2 * g + 90, 80, 80));
 	for (let i = 0; i < 3; i += 2) boxes.push(bx(kx + (i - 1) * g, 1900, kz, 80, 80, 2 * g + 90));
-	const cl = person(rng, kx + r(rng, -550, 550), kz + r(rng, -550, 550), r(rng, 0, Math.PI * 2), 'hukande', kid());
-	cl.min[1] = 1000; // klatrar halvvegs oppe
-	boxes.push(cl);
-	boxes.push(person(rng, kx + r(rng, -700, 700), kz + g + 550, r(rng, 0, Math.PI * 2), 'staande', kid()));
+	boxes.push(...person(rng, kx + r(rng, -550, 550), kz + r(rng, -550, 550), r(rng, 0, Math.PI * 2), 'hukande', kid(), 1000)); // klatrar halvvegs oppe
+	boxes.push(...person(rng, kx + r(rng, -700, 700), kz + g + 550, r(rng, 0, Math.PI * 2), 'staande', kid()));
 	// huskestativ: to stolpar, toppbjelke, to seter — barn på det eine
 	const hx = r(rng, 2400, 3400);
 	const hz = r(rng, -2200, -1000);
@@ -1635,9 +1599,7 @@ function leikeplass(rng: Rng): Preset {
 	for (const s of [-1, 1]) {
 		boxes.push(bx(hx + hperp[0] * 800 * s, 620, hz + hperp[1] * 800 * s, 460, 90, 240, hyaw));
 	}
-	const sw = person(rng, hx + hperp[0] * 800, hz + hperp[1] * 800, hyaw, 'sitgolv', kid());
-	sw.min[1] = 710;
-	boxes.push(sw);
+	boxes.push(...person(rng, hx + hperp[0] * 800, hz + hperp[1] * 800, hyaw, 'sitgolv', kid(), 710)); // barn på huska
 	// sandkasse med born
 	const sx = r(rng, -400, 600);
 	const sz = r(rng, 1400, 2400);
@@ -1646,8 +1608,8 @@ function leikeplass(rng: Rng): Preset {
 	boxes.push(bx(sx, 0, sz + S / 2, S + 200, 260, 200));
 	boxes.push(bx(sx - S / 2, 0, sz, 200, 260, S - 200));
 	boxes.push(bx(sx + S / 2, 0, sz, 200, 260, S - 200));
-	boxes.push(person(rng, sx + r(rng, -S / 4, S / 4), sz + r(rng, -S / 4, S / 4), r(rng, 0, Math.PI * 2), 'sitgolv', kid()));
-	boxes.push(person(rng, sx + r(rng, -S / 4, S / 4), sz + r(rng, -S / 4, S / 4), r(rng, 0, Math.PI * 2), 'hukande', kid()));
+	boxes.push(...person(rng, sx + r(rng, -S / 4, S / 4), sz + r(rng, -S / 4, S / 4), r(rng, 0, Math.PI * 2), 'sitgolv', kid()));
+	boxes.push(...person(rng, sx + r(rng, -S / 4, S / 4), sz + r(rng, -S / 4, S / 4), r(rng, 0, Math.PI * 2), 'hukande', kid()));
 	if (rng() < 0.5) boxes.push(bx(sx + r(rng, -S / 3, S / 3), 0, sz + r(rng, -S / 3, S / 3), 220, 160, 220, r(rng, 0, 1))); // bøtte
 	// sklietårn med rekkverk, to steg og barn på toppen
 	const tx = r(rng, 1800, 2800);
@@ -1656,21 +1618,16 @@ function leikeplass(rng: Rng): Preset {
 	boxes.push(bx(tx, 1350, tz - 520, 1100, 620, 80));
 	boxes.push(bx(tx - 850, 0, tz, 600, 450, 500));
 	boxes.push(bx(tx - 780, 450, tz, 460, 450, 500));
-	const tk = person(rng, tx, tz + 250, r(rng, 0, Math.PI * 2), 'staande', kid());
-	tk.min[1] = 1350;
-	boxes.push(tk);
+	boxes.push(...person(rng, tx, tz + 250, r(rng, 0, Math.PI * 2), 'vinkande', kid(), 1350)); // på tårnet, vinkar
 	// benk med sitjande forelder + ståande forelder + hund
 	const bxp = r(rng, -1200, 0);
 	const bzp = r(rng, -3200, -2400);
 	boxes.push(bx(bxp, 0, bzp, 1600, 440, 550, r(rng, -0.15, 0.15)));
-	const par = person(rng, bxp + r(rng, -400, 400), bzp, r(rng, -0.3, 0.3), 'sitjande');
-	par.min[1] = 440;
-	par.size[1] -= 440;
-	boxes.push(par);
-	boxes.push(person(rng, bxp + r(rng, 900, 1500), bzp + r(rng, 200, 600), r(rng, -0.4, 0.4), 'staande'));
+	boxes.push(...person(rng, bxp + r(rng, -400, 400), bzp, r(rng, -0.3, 0.3), 'sitjande')); // forelder på benken
+	boxes.push(...person(rng, bxp + r(rng, 900, 1500), bzp + r(rng, 200, 600), r(rng, -0.4, 0.4), 'staande'));
 	if (rng() < 0.6) boxes.push(...dog(rng, r(rng, -1500, 1500), r(rng, -800, 800), r(rng, 0, Math.PI * 2)));
 	for (let i = 0; i < ri(rng, 1, 3); i++) {
-		boxes.push(person(rng, r(rng, -2000, 2000), r(rng, -1200, 1200), r(rng, 0, Math.PI * 2), rng() < 0.6 ? 'gaande' : 'staande', kid()));
+		boxes.push(...person(rng, r(rng, -2000, 2000), r(rng, -1200, 1200), r(rng, 0, Math.PI * 2), rng() < 0.6 ? 'gaande' : 'staande', kid()));
 	}
 	const camera = pick(rng, [
 		// barneauge midt på plassen: alt ruver
@@ -1741,18 +1698,15 @@ function museum(rng: Rng): Preset {
 	const mbx = r(rng, -W / 4, W / 4);
 	const mbz = r(rng, 900, 1900);
 	boxes.push(bx(mbx, 0, mbz, 1700, 440, 600, r(rng, -0.1, 0.1)));
-	const sit = person(rng, mbx + r(rng, -400, 400), mbz, Math.atan2(px - mbx, pz - mbz), 'sitjande');
-	sit.min[1] = 440;
-	sit.size[1] -= 440;
-	boxes.push(sit);
+	boxes.push(...person(rng, mbx + r(rng, -400, 400), mbz, Math.atan2(px - mbx, pz - mbz), 'sitjande'));
 	// vitjarar: par framfor veggen, lener ved sokkelen, barn, vakt
 	const vx = r(rng, -W / 2 + 1900, -W / 2 + 2700);
 	const vz = r(rng, -900, 900);
-	boxes.push(person(rng, vx, vz, -Math.PI / 2, 'staande'));
-	boxes.push(person(rng, vx + r(rng, 450, 750), vz + r(rng, 500, 900), -Math.PI / 2 + r(rng, -0.3, 0.3), 'staande'));
-	boxes.push(person(rng, lastPlinth[0] * 0.72, lastPlinth[1] + r(rng, -400, 400), Math.atan2(lastPlinth[0] * 0.28, 0), 'lener'));
-	boxes.push(person(rng, px + bside[0] * 2400, pz + bside[1] * 2400, Math.atan2(-bside[0], -bside[1]), 'staande', r(rng, 0.6, 0.72)));
-	boxes.push(person(rng, r(rng, -1500, 1500), -D / 2 + 800, r(rng, -0.4, 0.4), 'staande'));
+	boxes.push(...person(rng, vx, vz, -Math.PI / 2, 'staande'));
+	boxes.push(...person(rng, vx + r(rng, 450, 750), vz + r(rng, 500, 900), -Math.PI / 2 + r(rng, -0.3, 0.3), 'staande'));
+	boxes.push(...person(rng, lastPlinth[0] * 0.72, lastPlinth[1] + r(rng, -400, 400), Math.atan2(lastPlinth[0] * 0.28, 0), 'lener'));
+	boxes.push(...person(rng, px + bside[0] * 2400, pz + bside[1] * 2400, Math.atan2(-bside[0], -bside[1]), 'staande', r(rng, 0.6, 0.72)));
+	boxes.push(...person(rng, r(rng, -1500, 1500), -D / 2 + 800, r(rng, -0.4, 0.4), 'staande'));
 	const camera = pick(rng, [
 		// under beistet: froskeblikk langs ribbekassa
 		lookFrom([px - bside[0] * 1950, 520, pz - bside[1] * 1950], [px + bdir[0] * 1600, 3500, pz + bdir[1] * 1600], 244),
@@ -1787,7 +1741,7 @@ function bilverkstad(rng: Rng): Preset {
 	] as Array<[number, number]>) {
 		boxes.push(bx(liftX + lperp[0] * 800 * a + ldir[0] * 1420 * b, 1700, liftZ + lperp[1] * 800 * a + ldir[1] * 1420 * b, 250, 620, 620, lyaw));
 	}
-	boxes.push(person(rng, liftX + r(rng, -300, 300), liftZ + r(rng, -500, 500), r(rng, 0, Math.PI * 2), 'staande')); // mekanikar UNDER bilen
+	boxes.push(...person(rng, liftX + r(rng, -300, 300), liftZ + r(rng, -500, 500), r(rng, 0, Math.PI * 2), 'staande')); // mekanikar UNDER bilen
 	// bil på golvet med oppslått panser og bøygd mekanikar
 	const gcx = r(rng, 1900, 3200);
 	const gcz = r(rng, 900, 2100);
@@ -1796,7 +1750,7 @@ function bilverkstad(rng: Rng): Preset {
 	boxes.push(bx(gcx, 0, gcz, 1780, 1120, 4400, gyaw));
 	boxes.push(bx(gcx - gdir[0] * 300, 1120, gcz - gdir[1] * 300, 1620, 480, 2300, gyaw));
 	boxes.push(bx(gcx + gdir[0] * 1650, 1150, gcz + gdir[1] * 1650, 1500, 700, 120, gyaw)); // panser opp
-	boxes.push(person(rng, gcx + gdir[0] * 2650, gcz + gdir[1] * 2650, Math.atan2(-gdir[0], -gdir[1]), 'boygd'));
+	boxes.push(...person(rng, gcx + gdir[0] * 2650, gcz + gdir[1] * 2650, Math.atan2(-gdir[0], -gdir[1]), 'boygd'));
 	// dekkstablar
 	for (let i = 0; i < ri(rng, 2, 3); i++) {
 		const tx = r(rng, -4200, -2800);
@@ -1822,7 +1776,7 @@ function bilverkstad(rng: Rng): Preset {
 	boxes.push(bx(ehx, 0, ehz - 400, 200, 2300, 200));
 	boxes.push(bx(ehx, 2150, ehz + 350, 180, 160, 1500));
 	boxes.push(bx(ehx, 1250, ehz + 900, 540, 500, 600, r(rng, 0, 0.4)));
-	if (rng() < 0.7) boxes.push(person(rng, ehx + r(rng, 700, 1100), ehz + r(rng, 300, 900), r(rng, 0, Math.PI * 2), 'hukande'));
+	if (rng() < 0.7) boxes.push(...person(rng, ehx + r(rng, 700, 1100), ehz + r(rng, 300, 900), r(rng, 0, Math.PI * 2), 'hukande'));
 	const camera = pick(rng, [
 		// kjg-blikket: på ryggen under bilen, understellet fyller himmelen
 		lookFrom([liftX - lperp[0] * 900 + ldir[0] * 1600, 430, liftZ - lperp[1] * 900 + ldir[1] * 1600], [liftX + ldir[0] * 300, 2100, liftZ + ldir[1] * 300], 246),
@@ -1845,7 +1799,7 @@ function festsal(rng: Rng): Preset {
 	for (let tI = 0; tI < 2; tI++) {
 		const tx = (tI - 0.5) * gap;
 		boxes.push(bx(tx, 0, 0, 1050, 760, tblL, r(rng, -0.02, 0.02)));
-		const per = ri(rng, 5, 6);
+		const per = ri(rng, 3, 4);
 		for (const side of [-1, 1]) {
 			for (let i = 0; i < per; i++) {
 				if (rng() < 0.15) continue; // tom stol
@@ -1853,9 +1807,7 @@ function festsal(rng: Rng): Preset {
 				const gx = tx + side * 900;
 				const facing = side < 0 ? Math.PI / 2 : -Math.PI / 2;
 				boxes.push(bx(gx, 0, gz, 430, 460, 430, facing));
-				const guest = person(rng, gx - side * 60, gz, facing + r(rng, -0.25, 0.25), 'sitgolv');
-				guest.min[1] = 460;
-				boxes.push(guest);
+				boxes.push(...person(rng, gx - side * 60, gz, facing + r(rng, -0.25, 0.25), 'sitjande'));
 			}
 		}
 		for (let i = 0; i < ri(rng, 4, 6); i++) {
@@ -1872,14 +1824,12 @@ function festsal(rng: Rng): Preset {
 	for (let i = 0; i < 3; i++) {
 		const hx = (i - 1) * 1250 + r(rng, -150, 150);
 		boxes.push(bx(hx, 300, headZ - 850, 430, 460, 430, 0));
-		const hg = person(rng, hx, headZ - 850, r(rng, -0.2, 0.2), 'sitgolv');
-		hg.min[1] = 760;
-		boxes.push(hg);
+		boxes.push(...person(rng, hx, headZ - 850, r(rng, -0.2, 0.2), 'sitjande', 1, 300)); // på pallen
 	}
 	for (const s of [-1, 1]) boxes.push(bx(s * r(rng, 900, 1400), 1060, headZ, 110, r(rng, 260, 380), 110)); // kandelaber
 	// kelnarar: gåande i midtgangen + bøygd skjenkjande ved ytterkanten
-	boxes.push(person(rng, r(rng, -400, 400), r(rng, -tblL / 2 + 1000, tblL / 2 - 500), (rng() < 0.5 ? 0 : Math.PI) + r(rng, -0.25, 0.25), 'gaande'));
-	boxes.push(person(rng, -gap / 2 - 1600, r(rng, -tblL / 4, tblL / 4), Math.PI / 2, 'boygd'));
+	boxes.push(...person(rng, r(rng, -400, 400), r(rng, -tblL / 2 + 1000, tblL / 2 - 500), (rng() < 0.5 ? 0 : Math.PI) + r(rng, -0.25, 0.25), 'gaande'));
+	boxes.push(...person(rng, -gap / 2 - 1600, r(rng, -tblL / 4, tblL / 4), Math.PI / 2, 'boygd'));
 	// golvkandelaber i midtgangen: høge, tynne lysstakar
 	for (const cz of [-tblL / 4, tblL / 4]) {
 		const cx = r(rng, -500, 500);
@@ -1918,9 +1868,7 @@ function symjehall(rng: Rng): Preset {
 	boxes.push(bx(tw - 700, 0, -L / 2 - 1600, 300, 4800, 300));
 	boxes.push(bx(tw + 700, 0, -L / 2 - 1600, 300, 4800, 300));
 	boxes.push(bx(tw, 4800, -L / 2 - 1700, 1900, 250, 1400)); // plattform
-	const diver = person(rng, tw + r(rng, -350, 350), -L / 2 - 1500, Math.PI + r(rng, -0.2, 0.2), 'staande', r(rng, 0.92, 1));
-	diver.min[1] = 5050;
-	boxes.push(diver);
+	boxes.push(...person(rng, tw + r(rng, -350, 350), -L / 2 - 1500, Math.PI + r(rng, -0.2, 0.2), 'staande', r(rng, 0.92, 1), 5050)); // stupar på kanten
 	boxes.push(bx(tw + 2500, 0, -L / 2 - 1300, 750, 550, 950)); // sviktsokkel
 	boxes.push(bx(tw + 2500, 550, -L / 2 - 500, 520, 150, 2500)); // svikt ut over kanten
 	// leider og badevaktstol
@@ -1931,22 +1879,18 @@ function symjehall(rng: Rng): Preset {
 	boxes.push(bx(lgx - 180, 0, lgz, 150, 2000, 150));
 	boxes.push(bx(lgx + 180, 0, lgz, 150, 2000, 150));
 	boxes.push(bx(lgx, 2000, lgz, 620, 420, 560, Math.PI / 2)); // sete
-	const vakt = person(rng, lgx, lgz, Math.PI / 2, 'sitgolv');
-	vakt.min[1] = 2420;
-	boxes.push(vakt);
+	boxes.push(...person(rng, lgx, lgz, Math.PI / 2, 'sitgolv', 1, 2420)); // vakta høgt på stolen
 	// folk på dekket: symjarar, hukande ved kanten, born, trenar
-	boxes.push(person(rng, W / 2 + 1100, L / 2 - r(rng, 600, 1400), -Math.PI / 2, 'hukande'));
-	boxes.push(person(rng, -(W / 2 + 1000), -L / 4 + r(rng, -800, 800), Math.PI / 2, 'boygd'));
+	boxes.push(...person(rng, W / 2 + 1100, L / 2 - r(rng, 600, 1400), -Math.PI / 2, 'hukande'));
+	boxes.push(...person(rng, -(W / 2 + 1000), -L / 4 + r(rng, -800, 800), Math.PI / 2, 'boygd'));
 	for (let i = 0; i < ri(rng, 2, 4); i++) {
 		boxes.push(
-			person(rng, (rng() < 0.5 ? -1 : 1) * (W / 2 + r(rng, 800, 2200)), r(rng, -L / 2 + 600, L / 2 + 900), r(rng, 0, Math.PI * 2), rng() < 0.6 ? 'gaande' : 'staande', rng() < 0.3 ? r(rng, 0.6, 0.74) : 1)
+			...person(rng, (rng() < 0.5 ? -1 : 1) * (W / 2 + r(rng, 800, 2200)), r(rng, -L / 2 + 600, L / 2 + 900), r(rng, 0, Math.PI * 2), rng() < 0.6 ? 'gaande' : 'staande', rng() < 0.3 ? r(rng, 0.6, 0.74) : 1)
 		);
 	}
 	// benk med sitjande + bagar
 	boxes.push(bx(W / 2 + 2900, 0, -L / 4, 550, 440, 1700, 0));
-	const bs = person(rng, W / 2 + 2900, -L / 4 + r(rng, -400, 400), -Math.PI / 2, 'sitgolv');
-	bs.min[1] = 440;
-	boxes.push(bs);
+	boxes.push(...person(rng, W / 2 + 2900, -L / 4 + r(rng, -400, 400), -Math.PI / 2, 'sitjande')); // på benken
 	for (let i = 0; i < ri(rng, 1, 3); i++) {
 		boxes.push(bx(W / 2 + r(rng, 2500, 3200), 0, -L / 4 + r(rng, 900, 1800), 340, r(rng, 300, 420), 250, r(rng, 0, Math.PI * 2)));
 	}
@@ -1978,9 +1922,7 @@ function gymsal(rng: Rng): Preset {
 		}
 	}
 	// barn som klatrar i ribbeveggen
-	const climber = person(rng, rx + 250, r(rng, -1500, 1500), -Math.PI / 2, 'hukande', kid());
-	climber.min[1] = r(rng, 900, 1400);
-	boxes.push(climber);
+	boxes.push(...person(rng, rx + 250, r(rng, -1500, 1500), -Math.PI / 2, 'hukande', kid(), r(rng, 900, 1400))); // klatrar i ribbeveggen
 	// kasse (tre lag) med svikt og matter
 	const kx = r(rng, 600, 1600);
 	const kz = r(rng, -900, 300);
@@ -1993,23 +1935,21 @@ function gymsal(rng: Rng): Preset {
 	boxes.push(bx(kx + kdir[0] * 1900, 0, kz + kdir[1] * 1900, 2400, 120, 1500, kyaw)); // matte
 	boxes.push(bx(kx + kdir[0] * 1600 + 2900, 0, kz + kdir[1] * 1600 + 900, 2400, 120, 1500, kyaw + r(rng, -0.3, 0.3))); // matte til
 	// barn i tilløp mot svikta
-	boxes.push(person(rng, kx - kdir[0] * 2900, kz - kdir[1] * 2900, Math.atan2(kdir[0], kdir[1]), 'gaande', kid()));
+	boxes.push(...person(rng, kx - kdir[0] * 2900, kz - kdir[1] * 2900, Math.atan2(kdir[0], kdir[1]), 'gaande', kid()));
 	// bom med barn på
 	const bz2 = r(rng, 2300, 3000);
 	boxes.push(bx(-1900, 0, bz2, 250, 900, 250));
 	boxes.push(bx(1900, 0, bz2, 250, 900, 250));
 	boxes.push(bx(0, 900, bz2, 4100, 130, 110));
-	const balancer = person(rng, r(rng, -1100, 1100), bz2, Math.PI / 2 + r(rng, -0.15, 0.15), 'staande', kid());
-	balancer.min[1] = 1030;
-	boxes.push(balancer);
+	boxes.push(...person(rng, r(rng, -1100, 1100), bz2, Math.PI / 2 + r(rng, -0.15, 0.15), 'gaande', kid(), 1030)); // balanserer på bommen
 	// benker langs veggen + ballkorg
 	boxes.push(bx(3900, 0, -2400, 550, 380, 2400, r(rng, -0.05, 0.05)));
 	boxes.push(bx(3900, 0, 400, 550, 380, 2400, r(rng, -0.05, 0.05)));
 	boxes.push(bx(r(rng, 2800, 3600), 0, r(rng, 3400, 4200), 720, 620, 720, r(rng, 0, 0.5)));
 	// lærar + frie born
-	boxes.push(person(rng, kx - kdir[0] * 1200 + 1300, kz - kdir[1] * 1200, Math.atan2(-1, 0) + r(rng, -0.4, 0.4), 'staande'));
+	boxes.push(...person(rng, kx - kdir[0] * 1200 + 1300, kz - kdir[1] * 1200, Math.atan2(-1, 0) + r(rng, -0.4, 0.4), 'staande'));
 	for (let i = 0; i < ri(rng, 2, 3); i++) {
-		boxes.push(person(rng, r(rng, -2800, 2800), r(rng, -3400, 1500), r(rng, 0, Math.PI * 2), rng() < 0.5 ? 'gaande' : 'sitgolv', kid()));
+		boxes.push(...person(rng, r(rng, -2800, 2800), r(rng, -3400, 1500), r(rng, 0, Math.PI * 2), rng() < 0.5 ? 'gaande' : 'sitgolv', kid()));
 	}
 	const camera = pick(rng, [
 		// barneauge midt i salen: kassa og ribbeveggen ruver
@@ -2058,14 +1998,14 @@ function søylehall(rng: Rng): Preset {
 	const face = r(rng, -0.3, 0.3);
 	for (let i = 0; i < ri(rng, 4, 6); i++) {
 		boxes.push(
-			person(rng, x0 + r(rng, 0.4, cols - 1.4) * gx, z0 + r(rng, 0.2, rows - 1.1) * gz, face + r(rng, -0.15, 0.15), 'sitgolv')
+			...person(rng, x0 + r(rng, 0.4, cols - 1.4) * gx, z0 + r(rng, 0.2, rows - 1.1) * gz, face + r(rng, -0.15, 0.15), 'sitgolv')
 		);
 	}
-	boxes.push(person(rng, x0 + gx * 0.5, z0 + r(rng, 400, 1200), face, 'boygd'));
+	boxes.push(...person(rng, x0 + gx * 0.5, z0 + r(rng, 400, 1200), face, 'boygd'));
 	for (let i = 0; i < ri(rng, 1, 2); i++) {
-		boxes.push(person(rng, x0 + r(rng, 0, cols - 1) * gx + 900, z0 + r(rng, 0, rows - 1) * gz, r(rng, 0, Math.PI * 2), 'staande'));
+		boxes.push(...person(rng, x0 + r(rng, 0, cols - 1) * gx + 900, z0 + r(rng, 0, rows - 1) * gz, r(rng, 0, Math.PI * 2), 'staande'));
 	}
-	boxes.push(person(rng, x0 + gx * 1.6, z0 + gz * 1.4, r(rng, 0, Math.PI * 2), 'gaande', r(rng, 0.6, 0.72)));
+	boxes.push(...person(rng, x0 + gx * 1.6, z0 + gz * 1.4, r(rng, 0, Math.PI * 2), 'gaande', r(rng, 0.6, 0.72)));
 	const camera = pick(rng, [
 		// froskeblikk ved søylefoten: søylene konvergerer mot himmelen
 		lookFrom([x0 + gx - 550, 460, z0 + gz - 550], [x0 + 2 * gx, colH - 900, z0 + 2 * gz], 244),
@@ -2083,13 +2023,11 @@ function søylehall(rng: Rng): Preset {
 function orkester(rng: Rng): Preset {
 	const boxes: Box[] = [];
 	boxes.push(bx(0, 0, 0, 900, 350, 900, r(rng, -0.1, 0.1))); // podium
-	const dirigent = person(rng, -250, 0, r(rng, -0.2, 0.2), 'staande');
-	dirigent.min[1] = 350;
-	boxes.push(dirigent);
+	boxes.push(...person(rng, -250, 0, r(rng, -0.2, 0.2), 'vinkande', 1, 350)); // dirigenten med arm i lufta
 	// to bogar av musikarar, vende mot dirigenten
 	for (const [rad, count] of [
-		[2700, ri(rng, 4, 5)],
-		[4100, ri(rng, 6, 7)]
+		[2700, ri(rng, 3, 4)],
+		[4100, ri(rng, 5, 6)]
 	] as Array<[number, number]>) {
 		for (let i = 0; i < count; i++) {
 			const a = Math.PI / 2 + ((i + 0.5) / count - 0.5) * 1.7 + r(rng, -0.04, 0.04);
@@ -2097,9 +2035,7 @@ function orkester(rng: Rng): Preset {
 			const ez = Math.sin(a) * rad;
 			const toward = Math.atan2(-ex, -ez);
 			boxes.push(bx(ex, 0, ez, 430, 450, 430, toward));
-			const mus = person(rng, ex, ez, toward + r(rng, -0.15, 0.15), 'sitgolv');
-			mus.min[1] = 450;
-			boxes.push(mus);
+			boxes.push(...person(rng, ex, ez, toward + r(rng, -0.15, 0.15), 'sitjande'));
 			if (rng() < 0.6) {
 				const nx = ex - Math.sin(toward) * -650;
 				const nz = ez - Math.cos(toward) * -650;
@@ -2124,15 +2060,13 @@ function orkester(rng: Rng): Preset {
 	boxes.push(bx(fx, 750, fz, 1500, 420, 2400, fyaw)); // kropp
 	boxes.push(bx(fx - fperp[0] * 350, 1650, fz - fperp[1] * 350, 1350, 80, 2200, fyaw)); // lok på gløtt
 	boxes.push(bx(fx - fdir[0] * 1650, 0, fz - fdir[1] * 1650, 400, 450, 400, fyaw)); // krakk
-	const pianist = person(rng, fx - fdir[0] * 1620, fz - fdir[1] * 1620, fyaw, 'sitgolv');
-	pianist.min[1] = 450;
-	boxes.push(pianist);
+	boxes.push(...person(rng, fx - fdir[0] * 1620, fz - fdir[1] * 1620, fyaw, 'sitjande')); // pianisten
 	// pauker på høgre flanke + ståande paukist
 	const px2 = r(rng, 2700, 3300);
 	const pz2 = r(rng, 1600, 2400);
 	boxes.push(bx(px2, 0, pz2, 820, 900, 820, r(rng, 0, 0.6)));
 	boxes.push(bx(px2 + 1050, 0, pz2 + r(rng, -300, 300), 780, 860, 780, r(rng, 0, 0.6)));
-	boxes.push(person(rng, px2 + 500, pz2 + 900, Math.atan2(-px2, -pz2), 'staande'));
+	boxes.push(...person(rng, px2 + 500, pz2 + 900, Math.atan2(-px2, -pz2), 'staande'));
 	// kontrabass lent mot stativ ved bakre boge + tom stol
 	const cbx = r(rng, -1400, 1400);
 	boxes.push(bx(cbx, 0, 5200, 550, 1800, 380, r(rng, -0.3, 0.3)));
@@ -2190,9 +2124,9 @@ function lager(rng: Rng): Preset {
 	}
 	boxes.push(bx(-1900, 0, r(rng, -4200, -3400), 380, 300, 1500, r(rng, 0, Math.PI)));
 	// arbeidarar
-	boxes.push(person(rng, -1900 + r(rng, -400, 400), r(rng, 1500, 3500), r(rng, 0, Math.PI * 2), 'boygd'));
-	boxes.push(person(rng, 1900 + r(rng, -400, 400), tz - r(rng, 2200, 3200), Math.atan2(tdir[0], tdir[1]), 'gaande'));
-	if (rng() < 0.7) boxes.push(person(rng, r(rng, -600, 600), r(rng, -4800, -4000), r(rng, 0, Math.PI * 2), 'hukande'));
+	boxes.push(...person(rng, -1900 + r(rng, -400, 400), r(rng, 1500, 3500), r(rng, 0, Math.PI * 2), 'boygd'));
+	boxes.push(...person(rng, 1900 + r(rng, -400, 400), tz - r(rng, 2200, 3200), Math.atan2(tdir[0], tdir[1]), 'gaande'));
+	if (rng() < 0.7) boxes.push(...person(rng, r(rng, -600, 600), r(rng, -4800, -4000), r(rng, 0, Math.PI * 2), 'hukande'));
 	const camera = pick(rng, [
 		// i reolgata: lastkløfta konvergerer
 		lookFrom([-1900 + r(rng, -300, 300), 1620, -5400], [-1900, 2300, 4500], 234),
@@ -2225,7 +2159,7 @@ function bussterminal(rng: Rng): Preset {
 		const qx = doorX + bside[0] * 500 - bdir[0] * (900 + i * 780) + r(rng, -120, 120);
 		const qz = doorZ + bside[1] * 500 - bdir[1] * (900 + i * 780) + r(rng, -120, 120);
 		boxes.push(
-			person(rng, qx, qz, Math.atan2(bdir[0], bdir[1]) + r(rng, -0.2, 0.2), i === 0 ? 'staande' : weightedPose(rng, [
+			...person(rng, qx, qz, Math.atan2(bdir[0], bdir[1]) + r(rng, -0.2, 0.2), i === 0 ? 'staande' : weightedPose(rng, [
 				['staande', 3],
 				['gaande', 2],
 				['lener', 1]
@@ -2241,15 +2175,13 @@ function bussterminal(rng: Rng): Preset {
 	boxes.push(bx(lx, 2500, lz, 4200, 180, 1800));
 	boxes.push(bx(lx, 0, lz + 850, 4200, 1200, 100)); // bakvegg
 	boxes.push(bx(lx, 0, lz + 350, 1700, 440, 550));
-	const venter = person(rng, lx + r(rng, -500, 500), lz + 350, Math.PI + r(rng, -0.2, 0.2), 'sitgolv');
-	venter.min[1] = 440;
-	boxes.push(venter);
+	boxes.push(...person(rng, lx + r(rng, -500, 500), lz + 350, Math.PI + r(rng, -0.2, 0.2), 'sitjande')); // ventar på benken
 	// skiltstolpe og automat
 	boxes.push(bx(lx - 2600, 0, lz - 500, 90, 2400, 90));
 	boxes.push(bx(lx - 2600, 1950, lz - 500, 700, 450, 80, r(rng, -0.1, 0.1)));
 	if (rng() < 0.7) boxes.push(bx(lx + 2800, 0, lz + 300, 900, 1850, 750, r(rng, -0.1, 0.1)));
 	// lausløparar
-	boxes.push(person(rng, doorX - bdir[0] * 5500 + bside[0] * 1800, doorZ - bdir[1] * 5500 + bside[1] * 1800, Math.atan2(bdir[0], bdir[1]) + r(rng, -0.3, 0.3), 'gaande'));
+	boxes.push(...person(rng, doorX - bdir[0] * 5500 + bside[0] * 1800, doorZ - bdir[1] * 5500 + bside[1] * 1800, Math.atan2(bdir[0], bdir[1]) + r(rng, -0.3, 0.3), 'gaande'));
 	if (rng() < 0.5) boxes.push(...dog(rng, lx + r(rng, -1500, 1500), lz - r(rng, 1200, 2200), r(rng, 0, Math.PI * 2)));
 	const camera = pick(rng, [
 		// i køen: bussveggen ruvar, køen konvergerer mot døra

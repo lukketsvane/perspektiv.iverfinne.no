@@ -28,7 +28,7 @@ describe('presetar', () => {
 			for (const seed of [1, 7, 42]) {
 				const { boxes, camera } = buildPreset(name, rng(seed));
 				expect(boxes.length).toBeGreaterThanOrEqual(5);
-				expect(boxes.length).toBeLessThan(120);
+				expect(boxes.length).toBeLessThan(700); // mannekengar er 16 boksar kvar
 				const ids = new Set(boxes.map((b) => b.id));
 				expect(ids.size).toBe(boxes.length);
 				for (const b of boxes) {
@@ -93,11 +93,20 @@ describe('presetar', () => {
 		}
 	});
 
-	it('menneskeskala: folkemengd-figurar er 1.0–2.0 m', () => {
+	it('menneskeskala: folkemengda er mannekengar i VARIERTE naturlege høgder', () => {
 		const { boxes } = buildPreset('folkemengd', rng(3));
-		const figs = boxes.filter((b) => b.size[1] >= 1000);
-		expect(figs.length).toBeGreaterThan(3);
-		for (const f of figs) expect(f.size[1]).toBeLessThanOrEqual(2000);
+		const grps = new Set(
+			boxes.filter((b) => b.grp?.startsWith('mq:')).map((b) => b.grp as string)
+		);
+		expect(grps.size).toBeGreaterThanOrEqual(6);
+		const heights = new Set<number>();
+		for (const g of grps) {
+			const h = Number(g.split(':')[2]);
+			expect(h).toBeGreaterThanOrEqual(900); // born i fylgje er minst ~0.9 m
+			expect(h).toBeLessThanOrEqual(1900);
+			heights.add(h);
+		}
+		expect(heights.size).toBeGreaterThanOrEqual(4); // «ulike variasjonar høgder osv»
 	});
 
 	it('figurrekkje: leddstilte mannekengar i naturleg skala, på golvet', () => {
@@ -169,9 +178,14 @@ describe('presetar', () => {
 	});
 
 	it('scene-kommandoen i historikken angrar preset-lasting som eitt steg', () => {
+		// kanonisk form: nøkkelrekkjefylgja i json varierer mellom bygde og klona boksar
+		const canon = (bs: ReturnType<typeof buildPreset>['boxes']) =>
+			JSON.stringify(
+				bs.map((b) => ({ id: b.id, min: b.min, size: b.size, yaw: b.yaw, pitch: b.pitch ?? 0, grp: b.grp ?? '' }))
+			);
 		const doc = defaultDoc();
 		doc.boxes.push({ id: 'gammal', min: [0, 0, 0], size: [500, 500, 500], yaw: 0 });
-		const before = JSON.stringify(doc.boxes);
+		const before = canon(doc.boxes);
 		const h = makeHistory();
 		const preset = buildPreset('folkemengd', rng(2));
 		pushCmd(h, {
@@ -180,10 +194,10 @@ describe('presetar', () => {
 			after: preset.boxes.map((b) => cloneBox(b, b.id))
 		});
 		doc.boxes = preset.boxes;
-		const after = JSON.stringify(doc.boxes);
+		const after = canon(doc.boxes);
 		expect(undo(h, doc)).toBe(true);
-		expect(JSON.stringify(doc.boxes)).toBe(before);
+		expect(canon(doc.boxes)).toBe(before);
 		expect(redo(h, doc)).toBe(true);
-		expect(JSON.stringify(doc.boxes)).toBe(after);
+		expect(canon(doc.boxes)).toBe(after);
 	});
 });
