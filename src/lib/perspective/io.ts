@@ -78,6 +78,8 @@ export function parseDoc(json: string): Doc | null {
 		for (const k of Object.keys(settings) as Array<keyof typeof settings>) {
 			if (k === 'fit') {
 				if (s.fit === 'cover' || s.fit === 'inscribe') settings.fit = s.fit;
+			} else if (k === 'theme') {
+				if (s.theme === 'light' || s.theme === 'dark') settings.theme = s.theme;
 			} else if (typeof s[k] === 'boolean') {
 				(settings[k] as boolean) = s[k] as boolean;
 			}

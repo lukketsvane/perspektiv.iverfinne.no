@@ -152,17 +152,17 @@
 	.sheet {
 		position: fixed;
 		width: 220px;
-		background: #f7f4ee;
-		border: 1px solid rgba(26, 26, 28, 0.55);
+		background: var(--fp-paper, #f7f4ee);
+		border: 1px solid color-mix(in srgb, var(--fp-ink, #1a1a1c) 55%, transparent);
 		border-radius: 3px;
-		box-shadow: 2px 3px 0 rgba(26, 26, 28, 0.12);
+		box-shadow: 2px 3px 0 color-mix(in srgb, var(--fp-ink, #1a1a1c) 12%, transparent);
 		padding: 6px;
 		font:
 			500 12px ui-monospace,
 			SFMono-Regular,
 			Menlo,
 			monospace;
-		color: #1a1a1c;
+		color: var(--fp-ink, #1a1a1c);
 		user-select: none;
 		animation: inn 0.14s ease;
 	}
@@ -191,7 +191,7 @@
 		border-radius: 2px;
 	}
 	.row:active {
-		background: rgba(17, 85, 204, 0.1);
+		background: color-mix(in srgb, var(--fp-blue, #1155cc) 10%, transparent);
 	}
 	.seg {
 		display: flex;
@@ -202,15 +202,15 @@
 		flex: 1;
 		font: inherit;
 		background: none;
-		border: 1px solid rgba(26, 26, 28, 0.35);
+		border: 1px solid color-mix(in srgb, var(--fp-ink, #1a1a1c) 35%, transparent);
 		border-radius: 2px;
 		padding: 5px 0;
 		color: inherit;
 		cursor: pointer;
 	}
 	.seg button.on {
-		border-color: #1155cc;
-		color: #1155cc;
+		border-color: var(--fp-blue, #1155cc);
+		color: var(--fp-blue, #1155cc);
 	}
 	.preset {
 		padding-top: 4px;
@@ -221,16 +221,16 @@
 		width: 7px;
 		height: 7px;
 		border-radius: 50%;
-		border: 1px solid rgba(26, 26, 28, 0.5);
+		border: 1px solid color-mix(in srgb, var(--fp-ink, #1a1a1c) 50%, transparent);
 		flex: none;
 	}
 	.toggle.on .dot {
-		background: #c8232e;
-		border-color: #c8232e;
+		background: var(--fp-red, #c8232e);
+		border-color: var(--fp-red, #c8232e);
 	}
 	.sep {
 		height: 1px;
-		background: rgba(26, 26, 28, 0.18);
+		background: color-mix(in srgb, var(--fp-ink, #1a1a1c) 18%, transparent);
 		margin: 4px 2px;
 	}
 </style>

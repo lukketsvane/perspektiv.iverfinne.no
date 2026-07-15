@@ -17,13 +17,15 @@ export type Settings = {
 	jitter: boolean;
 	moduleTicks: boolean;
 	maskFaces: boolean;
+	theme: 'light' | 'dark';
+	locked: boolean; // referanselås: ingen redigering/kamera før opplåsing
 };
 
 export type Doc = { version: 1; boxes: Box[]; camera: CameraState; settings: Settings };
 
 export function defaultSettings(): Settings {
 	return {
-		fit: 'inscribe',
+		fit: 'cover', // heile skjermen er papir; innskriven sirkel er valet (c)
 		gridX: true,
 		gridY: true,
 		gridZ: true,
@@ -32,7 +34,9 @@ export function defaultSettings(): Settings {
 		vps: true,
 		jitter: false,
 		moduleTicks: false,
-		maskFaces: false
+		maskFaces: false,
+		theme: 'light',
+		locked: false
 	};
 }
 

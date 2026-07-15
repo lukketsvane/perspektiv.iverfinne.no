@@ -7,10 +7,11 @@ import type { Doc } from './scene';
 import { buildInk, jitterPolylines } from './ink';
 import { floorGridSegments, greatCircleFamily, HORIZON, vpList } from './grid';
 
-// bic-fargane (§5)
-const PAPER = '#f7f4ee';
-const INK = '#1a1a1c';
-const RED = '#c8232e';
+// bic-fargane (§5) + natt-variant; svg fylgjer gjeldande tema (wysiwyg)
+const PALETTES = {
+	light: { paper: '#f7f4ee', ink: '#1a1a1c', red: '#c8232e' },
+	dark: { paper: '#17171a', ink: '#e8e4d9', red: '#e04a52' }
+} as const;
 
 function fmt(n: number): string {
 	return (Math.round(n * 100) / 100).toString();
@@ -51,6 +52,7 @@ export function docToSvg(doc: Doc, view: { w: number; h: number }): string {
 	const P = (p: V3) => project(f, p);
 	const D = (d: V3) => projectDir(f, d);
 	const s = doc.settings;
+	const { paper: PAPER, ink: INK, red: RED } = PALETTES[s.theme] ?? PALETTES.light;
 
 	// golv
 	let golv = '';

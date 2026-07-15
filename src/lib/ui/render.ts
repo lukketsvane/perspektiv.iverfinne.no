@@ -20,10 +20,14 @@ import { floorGridSegments, greatCircleFamily, HORIZON, vpList } from '../perspe
 
 const JITTER_SEED = 0x5eed;
 
-export const PAPER = '#f7f4ee';
-export const INK = '#1a1a1c';
-export const RED = '#c8232e';
-export const BLUE = '#1155cc';
+// bic-fargane (§5) + invertert natt-variant
+export type Palette = { paper: string; ink: string; red: string; blue: string };
+export const LIGHT: Palette = { paper: '#f7f4ee', ink: '#1a1a1c', red: '#c8232e', blue: '#1155cc' };
+export const DARK: Palette = { paper: '#17171a', ink: '#e8e4d9', red: '#e04a52', blue: '#6b9dff' };
+
+export function paletteFor(theme: 'light' | 'dark'): Palette {
+	return theme === 'dark' ? DARK : LIGHT;
+}
 
 export type View = { w: number; h: number };
 
@@ -117,8 +121,9 @@ export function renderScene(
 	const floorSo: SampleOpts = { ...so, eps: 0.8 };
 	const cam = doc.camera;
 	const s = doc.settings;
+	const pal = paletteFor(s.theme);
 
-	ctx.fillStyle = PAPER;
+	ctx.fillStyle = pal.paper;
 	ctx.fillRect(0, 0, view.w, view.h);
 
 	const inscribe = doc.settings.fit !== 'cover' && !pano;
@@ -163,20 +168,20 @@ export function renderScene(
 	}
 
 	// golvgrid (verdslåst, klipt til skiver kring kamerafoten)
-	strokeLines(ctx, cache.floorFine, RED, 0.6, 0.22);
-	strokeLines(ctx, cache.floorCoarse, RED, 0.6, 0.4);
+	strokeLines(ctx, cache.floorFine, pal.red, 0.6, 0.22);
+	strokeLines(ctx, cache.floorCoarse, pal.red, 0.6, 0.4);
 
 	// raudgrid: tre storsirkelfamiliar, éi per verdsakse
-	for (const lines of cache.families) strokeLines(ctx, lines, RED, 0.6, 0.55);
+	for (const lines of cache.families) strokeLines(ctx, lines, pal.red, 0.6, 0.55);
 
 	// horisont med mm-merke for augehøgda
 	if (doc.settings.horizon) {
-		strokeLines(ctx, cache.horizon, RED, 1.0, 0.8);
+		strokeLines(ctx, cache.horizon, pal.red, 1.0, 0.8);
 		const ahead: V3 = [-Math.sin(doc.camera.yaw), 0, -Math.cos(doc.camera.yaw)];
 		const s = D(ahead);
 		if (s.visible) {
 			ctx.globalAlpha = 0.8;
-			ctx.fillStyle = RED;
+			ctx.fillStyle = pal.red;
 			ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
 			ctx.textAlign = 'left';
 			ctx.textBaseline = 'bottom';
@@ -187,7 +192,7 @@ export function renderScene(
 
 	// vp-prikkar med liten label
 	if (doc.settings.vps) {
-		ctx.fillStyle = RED;
+		ctx.fillStyle = pal.red;
 		ctx.font = '9px ui-monospace, SFMono-Regular, Menlo, monospace';
 		ctx.textAlign = 'left';
 		ctx.textBaseline = 'top';
@@ -219,12 +224,12 @@ export function renderScene(
 	if (s.maskFaces) {
 		// malar-rekkjefylgje (fjernast fyrst): kvar boks maskar det bak seg
 		for (const bi of inkBoxes) {
-			for (const loop of bi.fills) fillLoop(ctx, loop, PAPER);
+			for (const loop of bi.fills) fillLoop(ctx, loop, pal.paper);
 			const blue = bi.id === sel;
 			for (const { w, lines } of bi.strokes)
-				strokeLines(ctx, jit(lines), blue ? BLUE : INK, blue ? 1.2 : w, 0.95);
+				strokeLines(ctx, jit(lines), blue ? pal.blue : pal.ink, blue ? 1.2 : w, 0.95);
 			if (bi.ticks.length)
-				strokeLines(ctx, jit(bi.ticks), blue ? BLUE : INK, 0.9, 0.85);
+				strokeLines(ctx, jit(bi.ticks), blue ? pal.blue : pal.ink, 0.9, 0.85);
 		}
 	} else {
 		// rask veg: globale breidd-bøtter
@@ -245,10 +250,10 @@ export function renderScene(
 			}
 			ticks.push(...bi.ticks);
 		}
-		for (const [w, lines] of buckets) strokeLines(ctx, jit(lines), INK, w, 0.95);
-		if (ticks.length) strokeLines(ctx, jit(ticks), INK, 0.9, 0.85);
-		if (selInk.length) strokeLines(ctx, jit(selInk), BLUE, 1.2, 0.95);
-		if (selTicks.length) strokeLines(ctx, jit(selTicks), BLUE, 0.9, 0.85);
+		for (const [w, lines] of buckets) strokeLines(ctx, jit(lines), pal.ink, w, 0.95);
+		if (ticks.length) strokeLines(ctx, jit(ticks), pal.ink, 0.9, 0.85);
+		if (selInk.length) strokeLines(ctx, jit(selInk), pal.blue, 1.2, 0.95);
+		if (selTicks.length) strokeLines(ctx, jit(selTicks), pal.blue, 0.9, 0.85);
 	}
 
 	// gest-spøkjelse: fotavtrykk under oppteikning
@@ -264,12 +269,12 @@ export function renderScene(
 		const lines: Polyline[] = [];
 		for (let i = 0; i < 4; i++)
 			lines.push(...sampleSegment(P, corners[i], corners[(i + 1) % 4], so));
-		strokeLines(ctx, lines, BLUE, 1.2, 0.9);
+		strokeLines(ctx, lines, pal.blue, 1.2, 0.9);
 	}
 
 	// gest-spøkjelse: boks under ekstrudering/flytting
 	if (overlay.ghost) {
-		strokeLines(ctx, boxLines(f, overlay.ghost, so), BLUE, 1.2, 0.9);
+		strokeLines(ctx, boxLines(f, overlay.ghost, so), pal.blue, 1.2, 0.9);
 	}
 
 	ctx.restore();
@@ -277,7 +282,7 @@ export function renderScene(
 	// fiskeaugeranda
 	if (inscribe) {
 		ctx.globalAlpha = 0.5;
-		ctx.strokeStyle = INK;
+		ctx.strokeStyle = pal.ink;
 		ctx.lineWidth = 1;
 		ctx.beginPath();
 		ctx.arc(f.cx, f.cy, f.R, 0, Math.PI * 2);
@@ -288,7 +293,7 @@ export function renderScene(
 	// long-press progressring (touch-slett)
 	if (overlay.pressRing) {
 		const { x, y, t } = overlay.pressRing;
-		ctx.strokeStyle = BLUE;
+		ctx.strokeStyle = pal.blue;
 		ctx.lineWidth = 2;
 		ctx.globalAlpha = 0.85;
 		ctx.beginPath();

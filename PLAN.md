@@ -220,6 +220,8 @@ budsjett: sampler + teikning < 6 ms/frame ved 200 boksar (m1 macbook / ipad pro)
 
 - **meter i grensesnittet**: hud, horisontmerke og taltasting viser/tolkar meter (1.78⏎ = ståande auge). kjerna, snapping og json er framleis mm (§2 uendra); berre presentasjonslaget byter eining.
 - **scene-presetar med randomisering**: `presets.ts` med seks generatorar i menneskeskala — folkemengd, klasserom, verkstad, stall (hestar av boksar), hovudstudie (boksa hovud på soklar), figurrekkje. `t` lastar tilfeldig preset; arket listar alle. lastinga er eitt angre-steg (scene-kommando i history).
+- **cover som default**: papiret dekkjer heile skjermen; innskriven fiskeaugesirkel er valet (`c` / arket).
+- **verktøylinje** (mjukna ui-laust-krav, vedteke av brukaren): tre diskrete knappar oppe til høgre — referanselås (`l`; blokkerer all redigering og kamerarørsle når vindauget er teiknereferanse), inverter/mørk modus (`i`; papir↔blekk, persistert), og innstillingsarket (som elles ligg på to-finger long-press).
 
 ## 11. opne val
 

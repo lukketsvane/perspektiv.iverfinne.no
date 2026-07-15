@@ -247,12 +247,27 @@ const GRID_PRESETS: Array<[string, Partial<Settings>]> = [
 	['grid: av', { gridX: false, gridY: false, gridZ: false, floor: false, horizon: false, vps: false }]
 ];
 
+// handlingar som framleis verkar medan referanselåsen er på
+const ALLOW_LOCKED = new Set<Action['t']>([
+	'lock-toggle',
+	'theme-toggle',
+	'export-svg',
+	'export-json',
+	'press-ring',
+	'cancel'
+]);
+
 export function applyAction(ui: Ui, a: Action): void {
 	const cam = ui.doc.camera;
 	const s = ui.doc.settings;
 	const f = ui.frame;
 	// kjensle: skalert med fov og skjermstorleik
 	const kLook = cam.fov / (2.6 * Math.max(200, f?.R ?? 400));
+
+	if (s.locked && !ALLOW_LOCKED.has(a.t)) {
+		hud(ui, 'låst — l låser opp');
+		return;
+	}
 
 	switch (a.t) {
 		// ---- kamera ----
@@ -622,6 +637,14 @@ export function applyAction(ui: Ui, a: Action): void {
 			}
 			break;
 		}
+		case 'lock-toggle':
+			s.locked = !s.locked;
+			hud(ui, s.locked ? 'låst (referanse)' : 'låst opp');
+			break;
+		case 'theme-toggle':
+			s.theme = s.theme === 'dark' ? 'light' : 'dark';
+			hud(ui, s.theme === 'dark' ? 'mørk modus' : 'lys modus');
+			break;
 		case 'preset-load': {
 			if (ui.gest || ui.ghost) return; // aldri midt i ein gest
 			const name: PresetName =

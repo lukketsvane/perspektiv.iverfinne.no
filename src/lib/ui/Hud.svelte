@@ -16,7 +16,7 @@
 			Menlo,
 			monospace;
 		letter-spacing: 0.03em;
-		color: #1a1a1c;
+		color: var(--fp-ink, #1a1a1c);
 		opacity: 0;
 		transition: opacity 0.18s ease;
 		pointer-events: none;

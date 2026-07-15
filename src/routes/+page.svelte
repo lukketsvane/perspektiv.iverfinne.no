@@ -15,6 +15,6 @@
 		height: 100%;
 		overflow: hidden;
 		overscroll-behavior: none;
-		background: #f7f4ee;
+		background: var(--fp-paper, #f7f4ee);
 	}
 </style>

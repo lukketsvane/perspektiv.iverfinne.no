@@ -3,12 +3,13 @@
 	import { defaultDoc } from '../perspective/scene';
 	import { walk as camWalk } from '../perspective/camera';
 	import { loadLocal, makeAutosaver } from '../perspective/io';
-	import { renderScene } from './render';
+	import { paletteFor, renderScene } from './render';
 	import { hitTest } from './hittest';
 	import { createGestures, type Action, type GHit, type GPointer } from './gestures';
 	import { applyAction, ctxLabel, importJson, makeUi } from './ops';
 	import Hud from './Hud.svelte';
 	import Sheet from './Sheet.svelte';
+	import Toolbar from './Toolbar.svelte';
 
 	const ui = makeUi(defaultDoc(), () => performance.now());
 
@@ -18,6 +19,18 @@
 	let sheetOpen = $state(false);
 	let sheetX = $state(0);
 	let sheetY = $state(0);
+	let locked = $state(false);
+	let theme = $state<'light' | 'dark'>('light');
+
+	// tema-fargane som css-variablar for Hud/Sheet/Toolbar og body
+	const applyTheme = () => {
+		const pal = paletteFor(ui.doc.settings.theme);
+		const root = document.documentElement;
+		root.style.setProperty('--fp-paper', pal.paper);
+		root.style.setProperty('--fp-ink', pal.ink);
+		root.style.setProperty('--fp-blue', pal.blue);
+		root.style.setProperty('--fp-red', pal.red);
+	};
 
 	const act = (a: Action) => {
 		applyAction(ui, a);
@@ -25,6 +38,11 @@
 			sheetOpen = ui.sheet.open;
 			sheetX = ui.sheet.x;
 			sheetY = ui.sheet.y;
+		}
+		if (ui.doc.settings.locked !== locked) locked = ui.doc.settings.locked;
+		if (ui.doc.settings.theme !== theme) {
+			theme = ui.doc.settings.theme;
+			applyTheme();
 		}
 	};
 
@@ -57,6 +75,9 @@
 			Object.assign(ui.doc.camera, saved.camera);
 			Object.assign(ui.doc.settings, saved.settings);
 		}
+		locked = ui.doc.settings.locked;
+		theme = ui.doc.settings.theme;
+		applyTheme();
 		const autosaver = makeAutosaver(() => ui.doc);
 
 		const engine = createGestures({
@@ -165,7 +186,7 @@
 			engine.tick();
 
 			const ws = engine.walkState();
-			if (ws.active) {
+			if (ws.active && !ui.doc.settings.locked) {
 				const v = 1400 * (ws.sprint ? 4 : 1) * dt;
 				camWalk(ui.doc.camera, ws.f * v, ws.s * v);
 				ui.dirty = true;
@@ -222,6 +243,7 @@
 
 <canvas bind:this={canvas}></canvas>
 <Hud text={hudText} visible={hudVisible} />
+<Toolbar {locked} {theme} {act} />
 <Sheet
 	open={sheetOpen}
 	x={sheetX}
@@ -242,6 +264,6 @@
 		touch-action: none;
 		user-select: none;
 		-webkit-user-select: none;
-		background: #f7f4ee;
+		background: var(--fp-paper, #f7f4ee);
 	}
 </style>
