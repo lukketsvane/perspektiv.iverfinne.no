@@ -2,17 +2,46 @@
 	import { onMount } from 'svelte';
 	import { defaultDoc } from '../perspective/scene';
 	import { walk as camWalk } from '../perspective/camera';
+	import { loadLocal, makeAutosaver } from '../perspective/io';
 	import { renderScene } from './render';
 	import { hitTest } from './hittest';
-	import { createGestures, type GHit, type GPointer } from './gestures';
-	import { applyAction, ctxLabel, makeUi } from './ops';
+	import { createGestures, type Action, type GHit, type GPointer } from './gestures';
+	import { applyAction, ctxLabel, importJson, makeUi } from './ops';
 	import Hud from './Hud.svelte';
+	import Sheet from './Sheet.svelte';
 
 	const ui = makeUi(defaultDoc(), () => performance.now());
 
 	let canvas: HTMLCanvasElement | undefined = $state();
 	let hudText = $state('');
 	let hudVisible = $state(false);
+	let sheetOpen = $state(false);
+	let sheetX = $state(0);
+	let sheetY = $state(0);
+
+	const act = (a: Action) => {
+		applyAction(ui, a);
+		if (ui.sheet.open !== sheetOpen) {
+			sheetOpen = ui.sheet.open;
+			sheetX = ui.sheet.x;
+			sheetY = ui.sheet.y;
+		}
+	};
+
+	const closeSheet = () => {
+		ui.sheet.open = false;
+		sheetOpen = false;
+	};
+
+	const doImport = (json: string) => {
+		if (importJson(ui, json)) {
+			hudText = 'json importert';
+			ui.hudUntil = performance.now() + 1200;
+		} else {
+			hudText = 'ugyldig json';
+			ui.hudUntil = performance.now() + 1200;
+		}
+	};
 
 	onMount(() => {
 		const cv = canvas!;
@@ -20,6 +49,15 @@
 		let w = 0;
 		let h = 0;
 		let dpr = 1;
+
+		// autolagra scene frå førre økt
+		const saved = loadLocal();
+		if (saved) {
+			ui.doc.boxes = saved.boxes;
+			Object.assign(ui.doc.camera, saved.camera);
+			Object.assign(ui.doc.settings, saved.settings);
+		}
+		const autosaver = makeAutosaver(() => ui.doc);
 
 		const engine = createGestures({
 			now: () => performance.now(),
@@ -31,7 +69,7 @@
 				if (hh.kind === 'floor') return { kind: 'floor' };
 				return { kind: 'void' };
 			},
-			emit: (a) => applyAction(ui, a),
+			emit: act,
 			isSelected: (id) => ui.selection === id,
 			hasSelection: () => ui.selection !== null
 		});
@@ -62,7 +100,11 @@
 		});
 
 		const down = (e: PointerEvent) => {
-			cv.setPointerCapture(e.pointerId);
+			try {
+				cv.setPointerCapture(e.pointerId);
+			} catch {
+				// peikaren kan alt vere borte (raske tapp); gesten skal likevel handsamast
+			}
 			engine.pointerDown(norm(e));
 			e.preventDefault();
 		};
@@ -76,6 +118,11 @@
 		const dbl = (e: MouseEvent) => engine.dblclick(e.clientX, e.clientY);
 		const ctxmenu = (e: Event) => e.preventDefault();
 		const kd = (e: KeyboardEvent) => {
+			if (sheetOpen && e.key === 'Escape') {
+				closeSheet();
+				e.preventDefault();
+				return;
+			}
 			if (
 				engine.keyDown(e.key, {
 					shift: e.shiftKey,
@@ -87,6 +134,14 @@
 				e.preventDefault();
 		};
 		const ku = (e: KeyboardEvent) => engine.keyUp(e.key);
+		// json-import via drag & drop på papiret
+		const dragover = (e: DragEvent) => e.preventDefault();
+		const drop = async (e: DragEvent) => {
+			e.preventDefault();
+			const f = e.dataTransfer?.files?.[0];
+			if (f && (f.type === 'application/json' || f.name.endsWith('.json')))
+				doImport(await f.text());
+		};
 
 		cv.addEventListener('pointerdown', down);
 		cv.addEventListener('pointermove', move);
@@ -97,6 +152,8 @@
 		cv.addEventListener('contextmenu', ctxmenu);
 		window.addEventListener('keydown', kd);
 		window.addEventListener('keyup', ku);
+		window.addEventListener('dragover', dragover);
+		window.addEventListener('drop', drop);
 
 		let raf = 0;
 		let tPrev = performance.now();
@@ -134,6 +191,7 @@
 					pressRing: ui.pressRing
 				}
 			);
+			autosaver.touch();
 		};
 		raf = requestAnimationFrame(loop);
 
@@ -145,6 +203,8 @@
 		return () => {
 			cancelAnimationFrame(raf);
 			ro.disconnect();
+			autosaver.flush();
+			autosaver.dispose();
 			cv.removeEventListener('pointerdown', down);
 			cv.removeEventListener('pointermove', move);
 			cv.removeEventListener('pointerup', up);
@@ -154,12 +214,23 @@
 			cv.removeEventListener('contextmenu', ctxmenu);
 			window.removeEventListener('keydown', kd);
 			window.removeEventListener('keyup', ku);
+			window.removeEventListener('dragover', dragover);
+			window.removeEventListener('drop', drop);
 		};
 	});
 </script>
 
 <canvas bind:this={canvas}></canvas>
 <Hud text={hudText} visible={hudVisible} />
+<Sheet
+	open={sheetOpen}
+	x={sheetX}
+	y={sheetY}
+	doc={ui.doc}
+	{act}
+	onimport={doImport}
+	onclose={closeSheet}
+/>
 
 <style>
 	canvas {
