@@ -149,15 +149,15 @@ describe('hysterese-låsing (§9.8)', () => {
 describe('taltasting-buffer (§9.8)', () => {
 	const HORIZON: GHit = { kind: 'horizon' };
 
-	it('under augehøgd-gest: siffer + enter gjev eksakt eye-set', () => {
+	it('under augehøgd-gest: siffer + enter gjev eksakt eye-set i meter', () => {
 		const r = rig(HORIZON);
 		r.engine.pointerDown({ id: 1, x: 300, y: 200, type: 'mouse', button: 0 });
 		expect(r.engine.mode()).toBe('eyeDrag');
-		for (const k of ['1', '7', '8', '0']) expect(r.engine.keyDown(k, {})).toBe(true);
-		expect(r.engine.numericBuffer()).toBe('1780');
+		for (const k of ['1', '.', '7', '8']) expect(r.engine.keyDown(k, {})).toBe(true);
+		expect(r.engine.numericBuffer()).toBe('1.78');
 		expect(r.engine.keyDown('Enter', {})).toBe(true);
 		const set = r.actions.find((a) => a.t === 'eye-set');
-		expect(set && set.t === 'eye-set' && set.mm).toBe(1780);
+		expect(set && set.t === 'eye-set' && set.m).toBe(1.78);
 		expect(r.engine.numericBuffer()).toBeNull();
 	});
 
@@ -176,12 +176,12 @@ describe('taltasting-buffer (§9.8)', () => {
 		const r = rig();
 		r.engine.wheel(-120, {});
 		expect(r.has('eye-wheel')).toBe(true);
+		expect(r.engine.keyDown('0', {})).toBe(true);
+		expect(r.engine.keyDown('.', {})).toBe(true);
 		expect(r.engine.keyDown('3', {})).toBe(true);
-		expect(r.engine.keyDown('0', {})).toBe(true);
-		expect(r.engine.keyDown('0', {})).toBe(true);
 		expect(r.engine.keyDown('Enter', {})).toBe(true);
 		const set = r.actions.find((a) => a.t === 'eye-set');
-		expect(set && set.t === 'eye-set' && set.mm).toBe(300);
+		expect(set && set.t === 'eye-set' && set.m).toBe(0.3);
 
 		r.clear();
 		r.advance(5000); // langt forbi vindauget

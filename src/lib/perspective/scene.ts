@@ -51,6 +51,14 @@ export function snapMm(v: number, step = SNAP_MM): number {
 	return Math.round(v / step) * step;
 }
 
+// intern eining er mm (§2); grensesnittet viser meter sidan alt er menneskeskala.
+// 1780 → "1.78", 300 → "0.3", 10000 → "10"
+export function formatM(mm: number): string {
+	const m = mm / 1000;
+	const s = Math.abs(m) >= 10 ? m.toFixed(1) : m.toFixed(2);
+	return s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+}
+
 export function snapYaw(a: number, step = SNAP_YAW): number {
 	return Math.round(a / step) * step;
 }

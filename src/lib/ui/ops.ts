@@ -6,6 +6,7 @@ import {
 	centroid,
 	cloneBox,
 	figureBoxAt,
+	formatM,
 	makeBoxFromFootprint,
 	newId,
 	rayPlaneY,
@@ -156,7 +157,7 @@ function hud(ui: Ui, text: string) {
 }
 
 function hudEye(ui: Ui) {
-	hud(ui, `augehøgd ${Math.round(ui.doc.camera.pos[1])} mm`);
+	hud(ui, `augehøgd ${formatM(ui.doc.camera.pos[1])} m`);
 }
 
 function hudFov(ui: Ui) {
@@ -167,15 +168,15 @@ function hudFov(ui: Ui) {
 export function ctxLabel(ctx: NumericCtx | null): string {
 	switch (ctx) {
 		case 'eye':
-			return 'augehøgd (mm)';
+			return 'augehøgd (m)';
 		case 'fov':
 			return 'fov (°)';
 		case 'height':
-			return 'høgd (mm)';
+			return 'høgd (m)';
 		case 'rot':
 			return 'rotasjon (°)';
 		case 'vmove':
-			return 'vertikal (mm)';
+			return 'vertikal (m)';
 		default:
 			return '';
 	}
@@ -228,7 +229,7 @@ function restoreBackup(ui: Ui, id: string, backup: Box): void {
 }
 
 function hudBoxPos(ui: Ui, b: Box) {
-	hud(ui, `x ${Math.round(b.min[0])} · z ${Math.round(b.min[2])} mm`);
+	hud(ui, `x ${formatM(b.min[0])} · z ${formatM(b.min[2])} m`);
 }
 
 const GRID_PRESETS: Array<[string, Partial<Settings>]> = [
@@ -271,7 +272,7 @@ export function applyAction(ui: Ui, a: Action): void {
 			hudEye(ui);
 			break;
 		case 'eye-set':
-			setEye(cam, a.mm);
+			setEye(cam, a.m * 1000);
 			hudEye(ui);
 			break;
 		case 'fov-wheel':
@@ -339,7 +340,10 @@ export function applyAction(ui: Ui, a: Action): void {
 			if (!p) return;
 			const b: [number, number] = [snapMm(p[0]), snapMm(p[2])];
 			ui.footprint = [ui.gest.a, b, ui.gest.baseY];
-			hud(ui, `${Math.abs(b[0] - ui.gest.a[0])} × ${Math.abs(b[1] - ui.gest.a[1])} mm`);
+			hud(
+				ui,
+				`${formatM(Math.abs(b[0] - ui.gest.a[0]))} × ${formatM(Math.abs(b[1] - ui.gest.a[1]))} m`
+			);
 			break;
 		}
 		case 'extrude-start': {
@@ -360,19 +364,19 @@ export function applyAction(ui: Ui, a: Action): void {
 			if (hAt === null) return;
 			const h = Math.min(50000, Math.max(50, snapMm(hAt - ui.ghost.min[1])));
 			ui.ghost.size[1] = h;
-			hud(ui, `h ${h} mm`);
+			hud(ui, `h ${formatM(h)} m`);
 			break;
 		}
 		case 'height-set': {
-			const h = Math.min(50000, Math.max(50, snapMm(a.mm)));
+			const h = Math.min(50000, Math.max(50, snapMm(a.m * 1000)));
 			if (ui.ghost) {
 				ui.ghost.size[1] = h;
-				hud(ui, `h ${h} mm`);
+				hud(ui, `h ${formatM(h)} m`);
 			} else if (ui.gest?.kind === 'push') {
 				const b = boxById(ui, ui.gest.id);
 				if (b) {
 					b.size[1] = h;
-					hud(ui, `h ${h} mm`);
+					hud(ui, `h ${formatM(h)} m`);
 				}
 			}
 			break;
@@ -450,7 +454,7 @@ export function applyAction(ui: Ui, a: Action): void {
 				Math.max(50, snapMm(ui.gest.backup.size[1] + (hNow - ui.gest.hGrab)))
 			);
 			b.size[1] = h;
-			hud(ui, `h ${h} mm`);
+			hud(ui, `h ${formatM(h)} m`);
 			break;
 		}
 
@@ -479,7 +483,7 @@ export function applyAction(ui: Ui, a: Action): void {
 				if (Math.abs(newY - top) < 60) newY = top;
 			}
 			b.min[1] = newY;
-			hud(ui, `y ${newY} mm`);
+			hud(ui, `y ${formatM(newY)} m`);
 			break;
 		}
 		case 'vmove-set': {
@@ -487,9 +491,9 @@ export function applyAction(ui: Ui, a: Action): void {
 			const b = inGest && ui.gest?.kind === 'vmove' ? boxById(ui, ui.gest.id) : selectedBox(ui);
 			if (!b) return;
 			const before = cloneBox(b, b.id);
-			b.min[1] = Math.max(0, a.mm);
+			b.min[1] = Math.max(0, a.m * 1000);
 			if (!inGest) recordUpdate(ui, before, b);
-			hud(ui, `y ${b.min[1]} mm`);
+			hud(ui, `y ${formatM(b.min[1])} m`);
 			break;
 		}
 
@@ -530,7 +534,7 @@ export function applyAction(ui: Ui, a: Action): void {
 			ui.doc.boxes.push(fb);
 			ui.selection = fb.id;
 			pushCmd(ui.history, { kind: 'add', box: cloneBox(fb, fb.id) });
-			hud(ui, 'figurboks 500 × 1750 × 300');
+			hud(ui, 'figurboks 0.5 × 1.75 × 0.3 m');
 			break;
 		}
 		case 'delete-selected': {

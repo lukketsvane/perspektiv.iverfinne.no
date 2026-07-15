@@ -14,7 +14,7 @@ import {
 	type Polyline,
 	type SampleOpts
 } from '../perspective/sample';
-import { boxEdges, type Box, type Doc } from '../perspective/scene';
+import { boxEdges, formatM, type Box, type Doc } from '../perspective/scene';
 import { buildInk, jitterPolylines } from '../perspective/ink';
 import { floorGridSegments, greatCircleFamily, HORIZON, vpList } from '../perspective/grid';
 
@@ -180,7 +180,7 @@ export function renderScene(
 			ctx.font = '10px ui-monospace, SFMono-Regular, Menlo, monospace';
 			ctx.textAlign = 'left';
 			ctx.textBaseline = 'bottom';
-			ctx.fillText(`${Math.round(doc.camera.pos[1])} mm`, s.x + 8, s.y - 4);
+			ctx.fillText(`${formatM(doc.camera.pos[1])} m`, s.x + 8, s.y - 4);
 			ctx.globalAlpha = 1;
 		}
 	}

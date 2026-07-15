@@ -30,7 +30,7 @@ export type Action =
 	| { t: 'walk'; dx: number; dy: number }
 	| { t: 'eye-drag'; dy: number }
 	| { t: 'eye-wheel'; delta: number }
-	| { t: 'eye-set'; mm: number }
+	| { t: 'eye-set'; m: number } // meter (grensesnittseining)
 	| { t: 'fov-wheel'; delta: number }
 	| { t: 'fov-pinch'; factor: number }
 	| { t: 'fov-set'; deg: number }
@@ -47,14 +47,14 @@ export type Action =
 	| { t: 'extrude-start' }
 	| { t: 'extrude-update'; x: number; y: number }
 	| { t: 'extrude-commit' }
-	| { t: 'height-set'; mm: number }
+	| { t: 'height-set'; m: number }
 	| { t: 'move-start'; id: string; x: number; y: number; duplicate: boolean }
 	| { t: 'move-update'; x: number; y: number }
 	| { t: 'move-commit' }
 	| { t: 'vmove-start'; id: string; x: number; y: number }
 	| { t: 'vmove-update'; x: number; y: number; dy: number }
 	| { t: 'vmove-commit' }
-	| { t: 'vmove-set'; mm: number }
+	| { t: 'vmove-set'; m: number }
 	| { t: 'pushpull-start'; id: string; x: number; y: number }
 	| { t: 'pushpull-update'; x: number; y: number }
 	| { t: 'pushpull-commit' }
@@ -180,19 +180,19 @@ export function createGestures(host: Host) {
 		if (!Number.isFinite(v)) return false;
 		switch (ctx) {
 			case 'eye':
-				emit({ t: 'eye-set', mm: v });
+				emit({ t: 'eye-set', m: v });
 				break;
 			case 'fov':
 				emit({ t: 'fov-set', deg: v });
 				break;
 			case 'height':
-				emit({ t: 'height-set', mm: v });
+				emit({ t: 'height-set', m: v });
 				break;
 			case 'rot':
 				emit({ t: 'rotate-set', deg: v });
 				break;
 			case 'vmove':
-				emit({ t: 'vmove-set', mm: v });
+				emit({ t: 'vmove-set', m: v });
 				break;
 		}
 		buffer = '';
