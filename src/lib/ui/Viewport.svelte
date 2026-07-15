@@ -21,6 +21,7 @@
 	let sheetY = $state(0);
 	let locked = $state(false);
 	let theme = $state<'light' | 'dark'>('light');
+	let drawMode = $state(false);
 
 	// tema-fargane som css-variablar for Hud/Sheet/Toolbar og body
 	const applyTheme = () => {
@@ -40,6 +41,7 @@
 			sheetY = ui.sheet.y;
 		}
 		if (ui.doc.settings.locked !== locked) locked = ui.doc.settings.locked;
+		if (ui.drawMode !== drawMode) drawMode = ui.drawMode;
 		if (ui.doc.settings.theme !== theme) {
 			theme = ui.doc.settings.theme;
 			applyTheme();
@@ -78,6 +80,13 @@
 		locked = ui.doc.settings.locked;
 		theme = ui.doc.settings.theme;
 		applyTheme();
+		if (ui.doc.boxes.length === 0) {
+			const coarse = window.matchMedia('(pointer: coarse)').matches;
+			ui.hudText = coarse
+				? 'dra: sjå · to fingrar: gå · lang-trykk golv: teikn · t: preset'
+				: 'dra: sjå · b: teiknemodus · t: preset · wasd: gå';
+			ui.hudUntil = performance.now() + 9000;
+		}
 		const autosaver = makeAutosaver(() => ui.doc);
 
 		const engine = createGestures({
@@ -92,7 +101,8 @@
 			},
 			emit: act,
 			isSelected: (id) => ui.selection === id,
-			hasSelection: () => ui.selection !== null
+			hasSelection: () => ui.selection !== null,
+			drawMode: () => ui.drawMode
 		});
 
 		const resize = () => {
@@ -250,7 +260,7 @@
 
 <canvas bind:this={canvas}></canvas>
 <Hud text={hudText} visible={hudVisible} />
-<Toolbar {locked} {theme} {act} />
+<Toolbar {locked} {theme} {drawMode} {act} />
 <Sheet
 	open={sheetOpen}
 	x={sheetX}

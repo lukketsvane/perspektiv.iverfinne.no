@@ -53,6 +53,7 @@ export type Ui = {
 	gridPreset: number;
 	gest: Gest;
 	history: History;
+	drawMode: boolean; // fingrar/mus teiknar direkte; medvite IKKJE persistert
 	dirty: boolean;
 	now: () => number;
 };
@@ -71,6 +72,7 @@ export function makeUi(doc: Doc, now: () => number): Ui {
 		gridPreset: 0,
 		gest: null,
 		history: makeHistory(),
+		drawMode: false,
 		dirty: true,
 		now
 	};
@@ -155,11 +157,11 @@ function deleteBoxById(ui: Ui, id: string): void {
 	if (ui.selection === id) ui.selection = null;
 }
 
-export const HUD_LINGER_MS = 800;
+const HUD_LINGER_MS = 800;
 
-function hud(ui: Ui, text: string) {
+function hud(ui: Ui, text: string, ms = HUD_LINGER_MS) {
 	ui.hudText = text;
-	ui.hudUntil = ui.now() + HUD_LINGER_MS;
+	ui.hudUntil = ui.now() + ms;
 }
 
 function hudEye(ui: Ui) {
@@ -353,6 +355,7 @@ export function applyAction(ui: Ui, a: Action): void {
 			const start: [number, number] = [snapMm(p[0]), snapMm(p[2])];
 			ui.gest = { kind: 'draw', a: start, baseY: 0 };
 			ui.footprint = [start, start, 0];
+			hud(ui, 'dra fotavtrykket', 1600);
 			break;
 		}
 		case 'draw-update': {
@@ -375,7 +378,7 @@ export function applyAction(ui: Ui, a: Action): void {
 			box.size[2] = Math.max(50, box.size[2]);
 			ui.ghost = box;
 			ui.footprint = null;
-			hud(ui, `h ${box.size[1]} mm`);
+			hud(ui, 'dra høgda · tapp/klikk festar', 2000);
 			break;
 		}
 		case 'extrude-update': {
@@ -644,6 +647,14 @@ export function applyAction(ui: Ui, a: Action): void {
 		case 'theme-toggle':
 			s.theme = s.theme === 'dark' ? 'light' : 'dark';
 			hud(ui, s.theme === 'dark' ? 'mørk modus' : 'lys modus');
+			break;
+		case 'drawmode-toggle':
+			ui.drawMode = !ui.drawMode;
+			hud(
+				ui,
+				ui.drawMode ? 'teiknemodus: drag teiknar boksar' : 'navigasjon: drag ser · lang-trykk teiknar',
+				1800
+			);
 			break;
 		case 'preset-load': {
 			if (ui.gest || ui.ghost) return; // aldri midt i ein gest
