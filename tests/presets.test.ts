@@ -107,7 +107,7 @@ describe('presetar', () => {
 	});
 
 	it('kvalitetsvakta: KVAR lasting av KVAR preset er eit sterkt startpunkt', () => {
-		// dette er garantien bak t-tasten: 13 presetar × 30 seed, alle over golvet
+		// dette er garantien bak t-tasten: alle presetar × 30 seed, alle over golvet
 		for (const name of PRESET_NAMES) {
 			for (let seed = 1; seed <= 30; seed++) {
 				const p = buildGreatPreset(name, rng(seed * 7 + 1));
