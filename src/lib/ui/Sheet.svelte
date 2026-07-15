@@ -157,6 +157,7 @@
 		width: 216px;
 		max-height: min(72vh, 560px);
 		overflow-y: auto;
+		touch-action: pan-y;
 		background: var(--fp-paper, #f7f4ee);
 		border: 1px solid color-mix(in srgb, var(--fp-ink, #1a1a1c) 55%, transparent);
 		border-radius: 3px;
@@ -187,6 +188,7 @@
 		}
 	}
 	.row {
+		touch-action: manipulation;
 		display: flex;
 		align-items: center;
 		gap: 6px;

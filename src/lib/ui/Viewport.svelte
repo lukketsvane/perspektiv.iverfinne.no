@@ -175,6 +175,11 @@
 		window.addEventListener('keyup', ku);
 		window.addEventListener('dragover', dragover);
 		window.addEventListener('drop', drop);
+		// ios safari ignorerer user-scalable=no: blokker side-pinch aktivt,
+		// elles zoomar heile sida og verktøylinja hamnar utanfor skjermen
+		const blockPageZoom = (e: Event) => e.preventDefault();
+		document.addEventListener('gesturestart', blockPageZoom, { passive: false });
+		document.addEventListener('gesturechange', blockPageZoom, { passive: false });
 
 		let raf = 0;
 		let tPrev = performance.now();
@@ -237,6 +242,8 @@
 			window.removeEventListener('keyup', ku);
 			window.removeEventListener('dragover', dragover);
 			window.removeEventListener('drop', drop);
+			document.removeEventListener('gesturestart', blockPageZoom);
+			document.removeEventListener('gesturechange', blockPageZoom);
 		};
 	});
 </script>
