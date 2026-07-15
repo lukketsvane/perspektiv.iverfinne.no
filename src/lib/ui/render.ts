@@ -15,7 +15,10 @@ import {
 	type SampleOpts
 } from '../perspective/sample';
 import { boxEdges, type Box, type Doc } from '../perspective/scene';
+import { buildInk, jitterPolylines } from '../perspective/ink';
 import { floorGridSegments, greatCircleFamily, HORIZON, vpList } from '../perspective/grid';
+
+const JITTER_SEED = 0x5eed;
 
 export const PAPER = '#f7f4ee';
 export const INK = '#1a1a1c';
@@ -56,6 +59,28 @@ function boxLines(f: Frame, b: Box, so: SampleOpts): Polyline[] {
 	const out: Polyline[] = [];
 	for (const [a, c] of boxEdges(b)) out.push(...sampleSegment(P, a, c, so));
 	return out;
+}
+
+// fyll ein flateloop (fleire polylinjedelar vert kopla med rette liner)
+function fillLoop(ctx: CanvasRenderingContext2D, loop: Polyline[], style: string): void {
+	if (loop.length === 0) return;
+	ctx.fillStyle = style;
+	ctx.beginPath();
+	let started = false;
+	for (const l of loop) {
+		for (let i = 0; i + 1 < l.length; i += 2) {
+			if (!started) {
+				ctx.moveTo(l[i], l[i + 1]);
+				started = true;
+			} else {
+				ctx.lineTo(l[i], l[i + 1]);
+			}
+		}
+	}
+	if (started) {
+		ctx.closePath();
+		ctx.fill();
+	}
 }
 
 // grid-cache (§8): retningslaga (storsirklar, horisont) er uavhengige av
@@ -182,17 +207,49 @@ export function renderScene(
 		ctx.globalAlpha = 1;
 	}
 
-	// blekk: boksane
+	// blekk: boksane (M6: avstandsvekta vekt, masker, modul-merke, jitter)
 	const sel = overlay.selection ?? null;
-	const inkLines: Polyline[] = [];
-	let selLines: Polyline[] = [];
-	for (const b of doc.boxes) {
-		const lines = boxLines(f, b, so);
-		if (b.id === sel) selLines = lines;
-		else inkLines.push(...lines);
+	const inkBoxes = buildInk(f, doc, {
+		maskFaces: s.maskFaces,
+		moduleTicks: s.moduleTicks,
+		sample: so
+	});
+	const jit = (lines: Polyline[]) => (s.jitter ? jitterPolylines(lines, JITTER_SEED) : lines);
+
+	if (s.maskFaces) {
+		// malar-rekkjefylgje (fjernast fyrst): kvar boks maskar det bak seg
+		for (const bi of inkBoxes) {
+			for (const loop of bi.fills) fillLoop(ctx, loop, PAPER);
+			const blue = bi.id === sel;
+			for (const { w, lines } of bi.strokes)
+				strokeLines(ctx, jit(lines), blue ? BLUE : INK, blue ? 1.2 : w, 0.95);
+			if (bi.ticks.length)
+				strokeLines(ctx, jit(bi.ticks), blue ? BLUE : INK, 0.9, 0.85);
+		}
+	} else {
+		// rask veg: globale breidd-bøtter
+		const buckets = new Map<number, Polyline[]>();
+		const ticks: Polyline[] = [];
+		let selInk: Polyline[] = [];
+		let selTicks: Polyline[] = [];
+		for (const bi of inkBoxes) {
+			if (bi.id === sel) {
+				for (const st of bi.strokes) selInk.push(...st.lines);
+				selTicks = bi.ticks;
+				continue;
+			}
+			for (const { w, lines } of bi.strokes) {
+				const arr = buckets.get(w);
+				if (arr) arr.push(...lines);
+				else buckets.set(w, [...lines]);
+			}
+			ticks.push(...bi.ticks);
+		}
+		for (const [w, lines] of buckets) strokeLines(ctx, jit(lines), INK, w, 0.95);
+		if (ticks.length) strokeLines(ctx, jit(ticks), INK, 0.9, 0.85);
+		if (selInk.length) strokeLines(ctx, jit(selInk), BLUE, 1.2, 0.95);
+		if (selTicks.length) strokeLines(ctx, jit(selTicks), BLUE, 0.9, 0.85);
 	}
-	strokeLines(ctx, inkLines, INK, 1.4, 0.95);
-	if (selLines.length) strokeLines(ctx, selLines, BLUE, 1.2, 0.95);
 
 	// gest-spøkjelse: fotavtrykk under oppteikning
 	if (overlay.footprint) {

@@ -3,7 +3,8 @@
 
 import { isPano, makeFrame, project, projectDir, type Frame, type V3 } from './projection';
 import { sampleDirLoop, sampleSegment, type Polyline, type SampleOpts } from './sample';
-import { boxEdges, type Doc } from './scene';
+import type { Doc } from './scene';
+import { buildInk, jitterPolylines } from './ink';
 import { floorGridSegments, greatCircleFamily, HORIZON, vpList } from './grid';
 
 // bic-fargane (§5)
@@ -27,6 +28,20 @@ function pathData(lines: Polyline[]): string {
 function pathEl(lines: Polyline[], stroke: string, width: number, opacity: number): string {
 	if (lines.length === 0) return '';
 	return `<path d="${pathData(lines)}" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-opacity="${opacity}" stroke-linejoin="round" stroke-linecap="round"/>`;
+}
+
+// papirfylt flateloop (delane vert kopla og lukka)
+function fillEl(loop: Polyline[], fill: string): string {
+	if (loop.length === 0) return '';
+	let d = '';
+	let started = false;
+	for (const l of loop) {
+		for (let i = 0; i + 1 < l.length; i += 2) {
+			d += started ? `L${fmt(l[i])} ${fmt(l[i + 1])}` : `M${fmt(l[i])} ${fmt(l[i + 1])}`;
+			started = true;
+		}
+	}
+	return `<path d="${d}Z" fill="${fill}"/>`;
 }
 
 export function docToSvg(doc: Doc, view: { w: number; h: number }): string {
@@ -76,12 +91,14 @@ export function docToSvg(doc: Doc, view: { w: number; h: number }): string {
 		}
 	}
 
-	// blekk
-	const inkLines: Polyline[] = [];
-	for (const b of doc.boxes) {
-		for (const [a, c] of boxEdges(b)) inkLines.push(...sampleSegment(P, a, c, so));
+	// blekk (M6: avstandsvekta vekt, masker, modul-merke, jitter) i malar-rekkjefylgje
+	const jit = (lines: Polyline[]) => (s.jitter ? jitterPolylines(lines, 0x5eed) : lines);
+	let blekk = '';
+	for (const bi of buildInk(f, doc, { maskFaces: s.maskFaces, moduleTicks: s.moduleTicks, sample: so })) {
+		for (const loop of bi.fills) blekk += fillEl(loop, PAPER);
+		for (const { w, lines } of bi.strokes) blekk += pathEl(jit(lines), INK, w, 0.95);
+		if (bi.ticks.length) blekk += pathEl(jit(bi.ticks), INK, 0.9, 0.85);
 	}
-	const blekk = pathEl(inkLines, INK, 1.4, 0.95);
 
 	const inscribe = s.fit !== 'cover' && !pano;
 	const clipShape = inscribe
