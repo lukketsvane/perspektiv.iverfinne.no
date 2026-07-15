@@ -4,10 +4,12 @@
 	let {
 		locked = false,
 		theme = 'light',
+		drawMode = false,
 		act
 	}: {
 		locked?: boolean;
 		theme?: 'light' | 'dark';
+		drawMode?: boolean;
 		act: (a: Action) => void;
 	} = $props();
 
@@ -20,6 +22,24 @@
 </script>
 
 <div class="bar" bind:this={el}>
+	<button
+		class="knapp"
+		class:aktiv={drawMode}
+		class:daud={locked}
+		title={drawMode ? 'navigasjon (b): drag ser' : 'teiknemodus (b): drag teiknar'}
+		aria-label="teiknemodus"
+		aria-pressed={drawMode}
+		disabled={locked}
+		onpointerdown={(e) => {
+			e.stopPropagation();
+			if (!locked) act({ t: 'drawmode-toggle' });
+		}}
+	>
+		<svg viewBox="0 0 16 16" aria-hidden="true">
+			<path d="M3 13l1-3.2 7.2-7.2a1.1 1.1 0 0 1 1.6 0l.6.6a1.1 1.1 0 0 1 0 1.6L6.2 12z" />
+			<path d="M10 4.5l1.5 1.5" />
+		</svg>
+	</button>
 	<button
 		class="knapp"
 		class:aktiv={locked}

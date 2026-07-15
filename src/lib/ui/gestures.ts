@@ -81,7 +81,8 @@ export type Action =
 	| { t: 'preset-load'; name: string | null }
 	// verktøylinja: referanselås og mørk modus
 	| { t: 'lock-toggle' }
-	| { t: 'theme-toggle' };
+	| { t: 'theme-toggle' }
+	| { t: 'drawmode-toggle' };
 
 export type Host = {
 	now?: () => number;
@@ -89,6 +90,9 @@ export type Host = {
 	emit: (a: Action) => void;
 	isSelected: (id: string) => boolean;
 	hasSelection: () => boolean;
+	// teiknemodus: fingrar/mus teiknar og redigerer direkte (v1.3-åtferda).
+	// av (default): å sjå er gratis, redigering krev seleksjon/lang-trykk/penn.
+	drawMode?: () => boolean;
 };
 
 // hysterese-tersklar (§4)
@@ -115,8 +119,10 @@ type Mode =
 	| 'dragVertical'
 	| 'rotate'
 	| 'boxPress' // touch: kandidat for tap-vel / long-press-slett / drag-flytt
+	| 'look1' // éin finger ser seg om (navigasjonsmodus); long-press på golv teiknar
 	| 'twoUndef'
 	| 'look2'
+	| 'walk2' // to-finger pan = gange (navigasjonsmodus)
 	| 'twist'
 	| 'pinch'
 	| 'walk3'
@@ -129,6 +135,7 @@ export type Gestures = ReturnType<typeof createGestures>;
 
 export function createGestures(host: Host) {
 	const now = host.now ?? (() => Date.now());
+	const drawing = () => host.drawMode?.() ?? false;
 
 	let mode: Mode = 'idle';
 	let mousePrev: { x: number; y: number } | null = null;
@@ -262,6 +269,7 @@ export function createGestures(host: Host) {
 		const h = host.hit(p.x, p.y);
 		startHit = h;
 		mousePrev = { x: p.x, y: p.y };
+		lookButton = p.button ?? 0;
 
 		if (p.button === 2) {
 			mode = h.kind === 'box' && host.isSelected(h.id) ? 'orbit' : 'look';
@@ -286,7 +294,14 @@ export function createGestures(host: Host) {
 			return;
 		}
 
+		// å sjå er gratis; redigering krev teiknemodus, penn eller alt vald boks
+		const editing = drawing() || p.type === 'pen';
+
 		if (h.kind === 'box') {
+			if (!editing && !host.isSelected(h.id)) {
+				mode = 'look'; // drag ser; klikk (utan drag) vel boksen i mouseUp
+				return;
+			}
 			if (p.shift) {
 				mode = 'dragVertical';
 				armCtx('vmove');
@@ -306,12 +321,13 @@ export function createGestures(host: Host) {
 			armCtx('eye');
 			return;
 		}
-		if (h.kind === 'floor') {
+		if (h.kind === 'floor' && editing) {
 			mode = 'drawFootprint';
 			emit({ t: 'draw-start', x: p.x, y: p.y });
 			return;
 		}
-		// void: ingenting; klikk-deseleksjon skjer i mouseUp
+		// golv/tomrom utan teiknemodus: sjå; klikk-deseleksjon skjer i mouseUp
+		mode = 'look';
 	}
 
 	function mouseMove(p: GPointer) {
@@ -374,6 +390,12 @@ export function createGestures(host: Host) {
 		switch (mode) {
 			case 'look':
 			case 'orbit':
+				// venstre-klikk (utan drag) vel/vel bort sjølv i sjå-modus
+				if (!wasDrag && lookButton === 0) {
+					if (startHit.kind === 'box') emit({ t: 'select', id: startHit.id });
+					else if (startHit.kind === 'floor' || startHit.kind === 'void')
+						emit({ t: 'select', id: null });
+				}
 				resetToIdle();
 				break;
 			case 'eyeDrag':
@@ -427,11 +449,13 @@ export function createGestures(host: Host) {
 	let startY: number | null = null;
 	let rotPrevX = Number.NaN;
 	let swallowNextUp = false;
+	let lookButton = 0;
 
 	// ---------- touch ----------
 
 	function touchDown(p: GPointer) {
 		touches.set(p.id, { id: p.id, x0: p.x, y0: p.y, x: p.x, y: p.y, t0: now() });
+		touchPrev.set(p.id, { x: p.x, y: p.y });
 		const n = touches.size;
 		maxCount = Math.max(maxCount, n);
 
@@ -447,11 +471,12 @@ export function createGestures(host: Host) {
 			} else if (h.kind === 'box') {
 				mode = 'boxPress';
 				pressBoxId = h.id;
-			} else if (h.kind === 'floor') {
+			} else if (h.kind === 'floor' && drawing()) {
 				mode = 'drawFootprint';
 				emit({ t: 'draw-start', x: p.x, y: p.y });
 			} else {
-				mode = 'idle';
+				// éin finger ser seg om; long-press på golvet teiknar (sjå tick)
+				mode = 'look1';
 			}
 			return;
 		}
@@ -464,7 +489,13 @@ export function createGestures(host: Host) {
 				clearNumeric();
 				return;
 			}
-			if (mode === 'dragMove' || mode === 'dragHeight' || mode === 'eyeDrag' || mode === 'boxPress') {
+			if (
+				mode === 'dragMove' ||
+				mode === 'dragHeight' ||
+				mode === 'eyeDrag' ||
+				mode === 'boxPress' ||
+				mode === 'look1'
+			) {
 				endSingleGesture(false);
 				emit({ t: 'press-ring', x: 0, y: 0, p: -1 });
 				pressBoxId = null;
@@ -495,7 +526,10 @@ export function createGestures(host: Host) {
 		t.x = p.x;
 		t.y = p.y;
 
-		if (mode === 'eyeDrag' && touches.size === 1) {
+		if (mode === 'look1' && touches.size === 1) {
+			const prev = touchPrev.get(p.id);
+			if (prev) emit({ t: 'look', dx: p.x - prev.x, dy: p.y - prev.y });
+		} else if (mode === 'eyeDrag' && touches.size === 1) {
 			const dy = p.y - (touchPrev.get(p.id)?.y ?? p.y);
 			armCtx('eye');
 			emit({ t: 'eye-drag', dy });
@@ -506,8 +540,15 @@ export function createGestures(host: Host) {
 		} else if (mode === 'boxPress') {
 			const moved = Math.hypot(t.x - t.x0, t.y - t.y0);
 			if (moved > TAP_PX && pressBoxId) {
-				// over i flytt (topp-flate: høgd)
 				emit({ t: 'press-ring', x: 0, y: 0, p: -1 });
+				// drag redigerer berre valde boksar (eller i teiknemodus);
+				// elles er draget berre å sjå seg om — tapp fyrst for å velje
+				if (!drawing() && !host.isSelected(pressBoxId)) {
+					mode = 'look1';
+					pressBoxId = null;
+					return;
+				}
+				// over i flytt (topp-flate: høgd)
 				if (startHit.kind === 'box' && startHit.face === 'top') {
 					mode = 'dragHeight';
 					armCtx('height');
@@ -536,7 +577,14 @@ export function createGestures(host: Host) {
 
 			if (pan > LOCK_PAN_PX && pan / LOCK_PAN_PX >= Math.abs(dAng) / LOCK_ROT_RAD && pan / LOCK_PAN_PX >= dScale / LOCK_SCALE) {
 				anyLock = true;
-				mode = startHit.kind === 'box' && host.isSelected(startHit.id) ? 'orbit' : 'look2';
+				// navigasjonsmodus: éin finger ser alt, so to-finger pan = gange;
+				// i teiknemodus er to-finger pan framleis sjå (éin finger teiknar)
+				mode =
+					startHit.kind === 'box' && host.isSelected(startHit.id)
+						? 'orbit'
+						: drawing()
+							? 'look2'
+							: 'walk2';
 				centPrev = c;
 			} else if (Math.abs(dAng) > LOCK_ROT_RAD && Math.abs(dAng) / LOCK_ROT_RAD >= dScale / LOCK_SCALE) {
 				anyLock = true;
@@ -555,12 +603,12 @@ export function createGestures(host: Host) {
 				distPrev = m.dist;
 				armCtx('fov');
 			}
-		} else if (mode === 'look2' || (mode === 'orbit' && touches.size >= 2)) {
+		} else if (mode === 'look2' || mode === 'walk2' || (mode === 'orbit' && touches.size >= 2)) {
 			const c = centroid();
 			const dx = c.x - centPrev.x;
 			const dy = c.y - centPrev.y;
 			centPrev = c;
-			emit({ t: mode === 'orbit' ? 'orbit' : 'look', dx, dy });
+			emit({ t: mode === 'orbit' ? 'orbit' : mode === 'walk2' ? 'walk' : 'look', dx, dy });
 		} else if (mode === 'twist') {
 			const m = pairMetrics();
 			let d = m.ang - angPrev;
@@ -659,6 +707,24 @@ export function createGestures(host: Host) {
 					pressBoxId = null;
 					mode = 'idle';
 					break;
+				case 'look1':
+					emit({ t: 'press-ring', x: 0, y: 0, p: -1 });
+					if (isTap) {
+						// tap på golv/tomrom: dobbelt-tap → figurboks, elles deseleksjon
+						if (
+							startHit.kind === 'floor' &&
+							now() - lastTap.t <= DOUBLE_TAP_MS &&
+							Math.hypot(t.x0 - lastTap.x, t.y0 - lastTap.y) <= DOUBLE_TAP_PX
+						) {
+							emit({ t: 'figure-stamp', x: t.x0, y: t.y0 });
+							lastTap = { x: 0, y: 0, t: -1e9 };
+						} else {
+							emit({ t: 'select', id: null });
+							lastTap = { x: t.x0, y: t.y0, t: now() };
+						}
+					}
+					mode = 'idle';
+					break;
 				case 'dragMove':
 					emit({ t: 'move-commit' });
 					mode = 'idle';
@@ -695,7 +761,7 @@ export function createGestures(host: Host) {
 			if (mode === 'pinch') armedUntil = now() + NUMERIC_ARM_MS;
 			if (mode !== 'extrude') mode = 'idle';
 			pressBoxId = null;
-		} else if (touches.size === 1 && (mode === 'look2' || mode === 'orbit' || mode === 'pinch' || mode === 'twist' || mode === 'twoUndef' || mode === 'walk3' || mode === 'threeUndef')) {
+		} else if (touches.size === 1 && (mode === 'look2' || mode === 'walk2' || mode === 'orbit' || mode === 'pinch' || mode === 'twist' || mode === 'twoUndef' || mode === 'walk3' || mode === 'threeUndef')) {
 			if (mode === 'twist') emit({ t: 'rotate-commit' });
 			mode = 'consumed'; // ikkje tolk att-verande finger som ny gest
 		}
@@ -708,18 +774,19 @@ export function createGestures(host: Host) {
 	function pointerDown(p: GPointer) {
 		startX = p.x;
 		startY = p.y;
-		if (p.type === 'mouse') mouseDown(p);
-		else touchDown(p);
+		// penn = presisjonsverktøy: alltid redigeringsløypa (som mus)
+		if (p.type === 'touch') touchDown(p);
+		else mouseDown(p);
 	}
 
 	function pointerMove(p: GPointer) {
-		if (p.type === 'mouse') mouseMove(p);
-		else touchMove(p);
+		if (p.type === 'touch') touchMove(p);
+		else mouseMove(p);
 	}
 
 	function pointerUp(p: GPointer) {
-		if (p.type === 'mouse') mouseUp(p);
-		else touchUp(p);
+		if (p.type === 'touch') touchUp(p);
+		else mouseUp(p);
 	}
 
 	function pointerCancel(id: number) {
@@ -861,6 +928,10 @@ export function createGestures(host: Host) {
 			emit({ t: 'theme-toggle' });
 			return true;
 		}
+		if (k === 'b') {
+			emit({ t: 'drawmode-toggle' });
+			return true;
+		}
 		if ((key === 'Delete' || key === 'Backspace' || k === 'x') && host.hasSelection()) {
 			emit({ t: 'delete-selected' });
 			return true;
@@ -897,6 +968,21 @@ export function createGestures(host: Host) {
 	// vert kalla frå raf: long-press-sjekkar
 	function tick() {
 		const t1 = now();
+		// navigasjonsmodus: long-press på golvet startar boks-teikning
+		if (mode === 'look1' && startHit.kind === 'floor' && touches.size === 1) {
+			const t = [...touches.values()][0];
+			if (t && Math.hypot(t.x - t.x0, t.y - t.y0) <= TAP_PX) {
+				const held = t1 - t.t0;
+				if (held > 160) emit({ t: 'press-ring', x: t.x, y: t.y, p: Math.min(1, held / LONGPRESS_DELETE_MS) });
+				if (held >= LONGPRESS_DELETE_MS) {
+					emit({ t: 'press-ring', x: 0, y: 0, p: -1 });
+					mode = 'drawFootprint';
+					emit({ t: 'draw-start', x: t.x0, y: t.y0 });
+				}
+			} else {
+				emit({ t: 'press-ring', x: 0, y: 0, p: -1 });
+			}
+		}
 		if (mode === 'boxPress' && pressBoxId) {
 			const t = [...touches.values()][0];
 			if (t) {

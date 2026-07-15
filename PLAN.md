@@ -225,6 +225,7 @@ budsjett: sampler + teikning < 6 ms/frame ved 200 boksar (m1 macbook / ipad pro)
 - **pose-drivne bounding boxes** (v1.3): figurboksane i presetane er tette kring posituren slik kjg teiknar dei — ståande/gåande/lenande/hukande/sitjande/bøygd med sterkt varierte proporsjonar; hundar og hestar som kropp+hovud(+bein). folkemengda er straumar/køar med følgjesvenar, samtalepar og kasse-sitjarar.
 - **ni presetar med designa synspunkt** (v1.3): + gate (stup frå takhøgd ned i husskaret, à la buss-arket), teiknekveld (publikumsring kring golvlerret) og interiør (rom med veggar og innreiing). kvar preset har 2–3 komponerte synspunkt (augehøgd, fov, sikteanker i boksane) som randomiseringa vel mellom.
 - **dokumentversjon 2** (v1.3): v1-lagringar migrerer `fit` → cover ved lasting (gamal default skal ikkje overstyre ny); aktive val elles overlever. kompaktare ark (to kolonnar, rulletak) og mindre verktøylinjeknappar.
+- **navigasjon fyrst** (v1.4, reviderer §4): å sjå skal koste ingenting, å plassere/redigere skal vere medvite. drag (mus som finger) ser seg om; klikk/tapp vel; drag redigerer berre den valde boksen. nye boksar krev anten teiknemodus (blyant-knappen / `b` — då gjeld §4-tabellen som før), long-press på golvet (touch), eller penn — apple pencil går alltid i redigeringsløypa. to-finger pan = gange i navigasjonsmodus (sjå i teiknemodus); resten av §4 står. flyktige hint i hud-en («dra fotavtrykket», «dra høgda · tapp festar») + fyrstegongstips på tomt papir.
 
 ## 11. opne val
 
