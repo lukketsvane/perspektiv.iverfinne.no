@@ -231,6 +231,8 @@ budsjett: sampler + teikning < 6 ms/frame ved 200 boksar (m1 macbook / ipad pro)
 
 - **kjg-stramming** (v1.6): shuffle-ikon direkte i verktøylinja (tilfeldig scene utan å opne arket, og utan å avsløre scenenamnet — berre namngjevne val frå arket viser namn). ny `sitgolv`-pose (hovud 0.85–1.0 m) for golv-sitjarar i teiknekveld/interiør; skuterføraren i naturleg sitjehøgd; høgdevakt-test (ingen menneskeproporsjonert boks over 2.0 m, søyler unnatekne). nærfelt-kravet i komposisjonsskåren stramma til 0.35–3.8 m (kim har alltid eit ruvande anker), og froskeblikk (0.47 m) og målarblikk (0.86 m) lagde til synspunktbanken.
 
+- **fem nye scener + detalj-pass** (v1.7, 18 presetar totalt): karavane (kamel/hest/struts bygde av boksar med ryttarar i salen, geiteflokk, gjetarar — demoarket), konsert (scenegolv, band, tromme-klynge, forsterkarar, lysrigg med kastarar, publikum i bogar, barn på skuldrene), perrong (togvegg, søylerekkje med tak, benker, ventande med kofferter), kjøkken (benkerekkjer med gryter, avtrekkshetter, bøygde kokkar), kontor (pultøyar med skjermar og sitjande, skiljeveggar, møtebord, planter, tavle). detalj-pass på eksisterande: verktøy på verkstadbenkene, bøker/sekkar i klasserommet, markiser og skilt i gata. alle med 3 komponerte synspunkt og dekte av kvalitets- og høgdevaktene.
+
 ## 11. opne val
 
 1. stakken i repoet: går ut frå sveltekit + ts + vitest + pnpm; stemmer det?

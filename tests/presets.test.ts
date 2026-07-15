@@ -80,9 +80,10 @@ describe('presetar', () => {
 					if (humanish) {
 						expect(h, `${name} seed ${seed}: boks ${w}×${h}×${d}`).toBeLessThanOrEqual(2000);
 					}
-					// ingen som «sit» (grunn boks over bakken) skal ha hovudet over 2.0 m
-					if (b.min[1] > 0 && b.min[1] < 1200 && w >= 380 && w <= 720 && h >= 500 && h <= 1500) {
-						expect(b.min[1] + h, `${name} seed ${seed}: sitjande topp`).toBeLessThanOrEqual(2050);
+					// personar over bakken (scener, salar, stolar): KROPPEN skal vere naturleg
+					// (≤ 2.0 m); absolutt topp kan gjerne vere høg — det er poenget med å ri
+					if (!columnLike && b.min[1] > 0 && w >= 380 && w <= 720 && d >= 240 && d <= 950 && h >= 700 && h <= 2600) {
+						expect(h, `${name} seed ${seed}: kroppshøgd over bakken`).toBeLessThanOrEqual(2000);
 					}
 				}
 			}
