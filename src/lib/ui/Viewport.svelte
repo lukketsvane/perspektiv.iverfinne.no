@@ -137,6 +137,11 @@
 		};
 		raf = requestAnimationFrame(loop);
 
+		// dev-introspeksjon for skripta verifisering (inga ui-flate)
+		if (import.meta.env.DEV) {
+			(window as unknown as Record<string, unknown>).__fp = { ui, engine };
+		}
+
 		return () => {
 			cancelAnimationFrame(raf);
 			ro.disconnect();
