@@ -58,6 +58,37 @@ describe('presetar', () => {
 		}
 	});
 
+	it('naturlege høgder: ingen menneskeproporsjonert boks på golvet over 2.0 m', () => {
+		// menneske-heuristikk: golvbasert, kroppsbreidd 0.38–0.72 m, djupn ≤ 0.95 m,
+		// høgd ≥ 0.7 m (stolpar/hyller/tønner fell utanfor på breidd/djupn)
+		for (const name of PRESET_NAMES) {
+			for (const seed of [3, 11, 27]) {
+				const { boxes } = buildPreset(name, rng(seed));
+				for (const b of boxes) {
+					const [w, h, d] = b.size;
+					// kvadratsnitta søyler (kranbein o.l.): struktur, ikkje menneske
+					const columnLike =
+						Math.abs(w - d) / Math.max(w, d) < 0.15 && h / Math.max(w, d) > 5;
+					const humanish =
+						!columnLike &&
+						b.min[1] === 0 &&
+						w >= 380 &&
+						w <= 720 &&
+						d >= 240 &&
+						d <= 950 &&
+						h >= 700;
+					if (humanish) {
+						expect(h, `${name} seed ${seed}: boks ${w}×${h}×${d}`).toBeLessThanOrEqual(2000);
+					}
+					// ingen som «sit» (grunn boks over bakken) skal ha hovudet over 2.0 m
+					if (b.min[1] > 0 && b.min[1] < 1200 && w >= 380 && w <= 720 && h >= 500 && h <= 1500) {
+						expect(b.min[1] + h, `${name} seed ${seed}: sitjande topp`).toBeLessThanOrEqual(2050);
+					}
+				}
+			}
+		}
+	});
+
 	it('menneskeskala: folkemengd- og figurrekkje-figurar er 1.0–2.0 m', () => {
 		for (const name of ['folkemengd', 'figurrekkje'] as const) {
 			const { boxes } = buildPreset(name, rng(3));

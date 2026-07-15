@@ -672,7 +672,8 @@ export function applyAction(ui: Ui, a: Action): void {
 			ui.selection = null;
 			Object.assign(ui.doc.camera, preset.camera);
 			clampCamera(ui.doc.camera);
-			hud(ui, `preset: ${name} (${preset.boxes.length} boksar)`);
+			// tilfeldig lasting held namnet løynt — scena taler for seg
+			if (a.name) hud(ui, `preset: ${name}`);
 			break;
 		}
 
