@@ -1,16 +1,20 @@
+<script lang="ts">
+	import Viewport from '$lib/ui/Viewport.svelte';
+</script>
+
 <svelte:head>
 	<title>femtepunkt</title>
 </svelte:head>
 
-<main>femtepunkt</main>
+<Viewport />
 
 <style>
-	main {
-		font-family: ui-monospace, monospace;
-		color: #1a1a1c;
+	:global(html, body) {
+		margin: 0;
+		padding: 0;
+		height: 100%;
+		overflow: hidden;
+		overscroll-behavior: none;
 		background: #f7f4ee;
-		height: 100dvh;
-		display: grid;
-		place-items: center;
 	}
 </style>
