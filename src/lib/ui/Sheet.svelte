@@ -21,7 +21,19 @@
 	} = $props();
 
 	// lokalt spegelbilete av innstillingane; friska opp ved opning og etter kvar handling
-	let snap = $state({ proj: 'stereo', gridX: true, gridY: true, gridZ: true, floor: true, horizon: true, vps: true, jitter: false, fit: 'inscribe' });
+	let snap = $state({
+		proj: 'stereo',
+		gridX: true,
+		gridY: true,
+		gridZ: true,
+		floor: true,
+		horizon: true,
+		vps: true,
+		jitter: false,
+		moduleTicks: false,
+		maskFaces: false,
+		fit: 'inscribe'
+	});
 
 	function refresh() {
 		snap = {
@@ -33,6 +45,8 @@
 			horizon: doc.settings.horizon,
 			vps: doc.settings.vps,
 			jitter: doc.settings.jitter,
+			moduleTicks: doc.settings.moduleTicks,
+			maskFaces: doc.settings.maskFaces,
 			fit: doc.settings.fit
 		};
 	}
@@ -101,6 +115,12 @@
 		<div class="sep"></div>
 		<button class="row toggle" class:on={snap.jitter} onpointerdown={() => toggle('jitter', !snap.jitter)}>
 			<span class="dot"></span>jitter
+		</button>
+		<button class="row toggle" class:on={snap.moduleTicks} onpointerdown={() => toggle('moduleTicks', !snap.moduleTicks)}>
+			<span class="dot"></span>modul-merke (h/8)
+		</button>
+		<button class="row toggle" class:on={snap.maskFaces} onpointerdown={() => toggle('maskFaces', !snap.maskFaces)}>
+			<span class="dot"></span>kvitmaska flater
 		</button>
 		<button
 			class="row toggle"

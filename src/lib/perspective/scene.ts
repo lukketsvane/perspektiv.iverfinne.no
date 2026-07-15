@@ -75,7 +75,7 @@ export function boxCorners(b: Box): V3[] {
 	return out;
 }
 
-const EDGE_IDX: Array<[number, number]> = [
+export const EDGE_IDX: Array<[number, number]> = [
 	// botn (y−)
 	[0, 1],
 	[1, 3],
