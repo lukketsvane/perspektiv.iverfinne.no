@@ -197,10 +197,21 @@ export function sampleSegment(proj: ProjPointFn, A: P3, B: P3, opts?: SampleOpts
 	const o = normOpts(opts);
 	const em = makeEmitter();
 	const pieces = o.camPos ? clipNear(A, B, o.camPos, o.nearClip) : ([[0, 1]] as Array<[number, number]>);
+	const scratch: P3 = [0, 0, 0];
+	const ax = A[0];
+	const ay = A[1];
+	const az = A[2];
+	const bx = B[0] - ax;
+	const by = B[1] - ay;
+	const bz = B[2] - az;
+	const ev: Ev = (t) => {
+		scratch[0] = ax + bx * t;
+		scratch[1] = ay + by * t;
+		scratch[2] = az + bz * t;
+		return proj(scratch);
+	};
 	for (const [ta, tb] of pieces) {
 		if (tb - ta < 1e-12) continue;
-		const ev: Ev = (t) =>
-			proj([A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t]);
 		sampleCurveInto(ev, ta, tb, em, o);
 		em.brk();
 	}
@@ -211,10 +222,14 @@ export function sampleSegment(proj: ProjPointFn, A: P3, B: P3, opts?: SampleOpts
 export function sampleDirLoop(projDir: ProjDirFn, u: P3, v: P3, opts?: SampleOpts): Polyline[] {
 	const o = normOpts(opts);
 	const em = makeEmitter();
+	const scratch: P3 = [0, 0, 0];
 	const ev: Ev = (t) => {
 		const ct = Math.cos(t);
 		const st = Math.sin(t);
-		return projDir([ct * u[0] + st * v[0], ct * u[1] + st * v[1], ct * u[2] + st * v[2]]);
+		scratch[0] = ct * u[0] + st * v[0];
+		scratch[1] = ct * u[1] + st * v[1];
+		scratch[2] = ct * u[2] + st * v[2];
+		return projDir(scratch);
 	};
 	const ARCS = 8;
 	for (let k = 0; k < ARCS; k++) {
@@ -235,10 +250,14 @@ export function sampleDirArc(
 ): Polyline[] {
 	const o = normOpts(opts);
 	const em = makeEmitter();
+	const scratch: P3 = [0, 0, 0];
 	const ev: Ev = (t) => {
 		const ct = Math.cos(t);
 		const st = Math.sin(t);
-		return projDir([ct * u[0] + st * v[0], ct * u[1] + st * v[1], ct * u[2] + st * v[2]]);
+		scratch[0] = ct * u[0] + st * v[0];
+		scratch[1] = ct * u[1] + st * v[1];
+		scratch[2] = ct * u[2] + st * v[2];
+		return projDir(scratch);
 	};
 	sampleCurveInto(ev, t0, t1, em, o);
 	em.brk();

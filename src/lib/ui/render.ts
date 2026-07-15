@@ -58,6 +58,26 @@ function boxLines(f: Frame, b: Box, so: SampleOpts): Polyline[] {
 	return out;
 }
 
+// grid-cache (§8): retningslaga (storsirklar, horisont) er uavhengige av
+// kameraposisjonen og vert berre reprosjiserte ved orienterings-/fov-/view-endring;
+// golvgridet i tillegg ved posisjonsendring.
+type GridCache = {
+	dirKey: string;
+	families: [Polyline[], Polyline[], Polyline[]];
+	horizon: Polyline[];
+	floorKey: string;
+	floorFine: Polyline[];
+	floorCoarse: Polyline[];
+};
+const cache: GridCache = {
+	dirKey: '',
+	families: [[], [], []],
+	horizon: [],
+	floorKey: '',
+	floorFine: [],
+	floorCoarse: []
+};
+
 export function renderScene(
 	ctx: CanvasRenderingContext2D,
 	doc: Doc,
@@ -69,6 +89,9 @@ export function renderScene(
 	const pano = isPano(doc.camera.proj);
 	const so: SampleOpts = { camPos: f.pos, maxJumpPx: pano ? view.w / 3 : undefined };
 	const gridSo: SampleOpts = { ...so, eps: 0.5 };
+	const floorSo: SampleOpts = { ...so, eps: 0.8 };
+	const cam = doc.camera;
+	const s = doc.settings;
 
 	ctx.fillStyle = PAPER;
 	ctx.fillRect(0, 0, view.w, view.h);
@@ -83,35 +106,47 @@ export function renderScene(
 	ctx.lineJoin = 'round';
 	ctx.lineCap = 'round';
 
-	// golvgrid (verdslåst, klipt til skiver kring kamerafoten)
-	if (doc.settings.floor) {
-		const { fine, coarse } = floorGridSegments(f.pos);
-		const P = (p: V3) => project(f, p);
-		const fineLines: Polyline[] = [];
-		for (const [a, b] of fine) fineLines.push(...sampleSegment(P, a, b, gridSo));
-		strokeLines(ctx, fineLines, RED, 0.6, 0.22);
-		const coarseLines: Polyline[] = [];
-		for (const [a, b] of coarse) coarseLines.push(...sampleSegment(P, a, b, gridSo));
-		strokeLines(ctx, coarseLines, RED, 0.6, 0.4);
+	const dirKey = `${cam.yaw}|${cam.pitch}|${cam.fov}|${cam.proj}|${f.R}|${f.cx}|${f.cy}|${f.w}x${f.h}|${s.gridX}${s.gridY}${s.gridZ}${s.horizon}`;
+	if (cache.dirKey !== dirKey) {
+		cache.dirKey = dirKey;
+		const axes: Array<[boolean, 0 | 1 | 2]> = [
+			[s.gridX, 0],
+			[s.gridY, 1],
+			[s.gridZ, 2]
+		];
+		for (const [on, axis] of axes) {
+			const lines: Polyline[] = [];
+			if (on)
+				for (const { u, v } of greatCircleFamily(axis))
+					lines.push(...sampleDirLoop(D, u, v, gridSo));
+			cache.families[axis] = lines;
+		}
+		cache.horizon = s.horizon ? sampleDirLoop(D, HORIZON.u, HORIZON.v, so) : [];
 	}
 
-	// raudgrid: tre storsirkelfamiliar, éi per verdsakse
-	const families: Array<[boolean, 0 | 1 | 2]> = [
-		[doc.settings.gridX, 0],
-		[doc.settings.gridY, 1],
-		[doc.settings.gridZ, 2]
-	];
-	for (const [on, axis] of families) {
-		if (!on) continue;
-		const lines: Polyline[] = [];
-		for (const { u, v } of greatCircleFamily(axis)) lines.push(...sampleDirLoop(D, u, v, gridSo));
-		strokeLines(ctx, lines, RED, 0.6, 0.55);
+	const floorKey = `${dirKey}|${f.pos[0]},${f.pos[1]},${f.pos[2]}|${s.floor}`;
+	if (cache.floorKey !== floorKey) {
+		cache.floorKey = floorKey;
+		cache.floorFine = [];
+		cache.floorCoarse = [];
+		if (s.floor) {
+			const { fine, coarse } = floorGridSegments(f.pos);
+			const P = (p: V3) => project(f, p);
+			for (const [a, b] of fine) cache.floorFine.push(...sampleSegment(P, a, b, floorSo));
+			for (const [a, b] of coarse) cache.floorCoarse.push(...sampleSegment(P, a, b, floorSo));
+		}
 	}
+
+	// golvgrid (verdslåst, klipt til skiver kring kamerafoten)
+	strokeLines(ctx, cache.floorFine, RED, 0.6, 0.22);
+	strokeLines(ctx, cache.floorCoarse, RED, 0.6, 0.4);
+
+	// raudgrid: tre storsirkelfamiliar, éi per verdsakse
+	for (const lines of cache.families) strokeLines(ctx, lines, RED, 0.6, 0.55);
 
 	// horisont med mm-merke for augehøgda
 	if (doc.settings.horizon) {
-		const lines = sampleDirLoop(D, HORIZON.u, HORIZON.v, so);
-		strokeLines(ctx, lines, RED, 1.0, 0.8);
+		strokeLines(ctx, cache.horizon, RED, 1.0, 0.8);
 		const ahead: V3 = [-Math.sin(doc.camera.yaw), 0, -Math.cos(doc.camera.yaw)];
 		const s = D(ahead);
 		if (s.visible) {
