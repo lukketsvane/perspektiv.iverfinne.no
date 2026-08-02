@@ -10,6 +10,7 @@
 	import Hud from './Hud.svelte';
 	import Sheet from './Sheet.svelte';
 	import Toolbar from './Toolbar.svelte';
+	import ModelStudio from './ModelStudio.svelte';
 
 	const ui = makeUi(defaultDoc(), () => performance.now());
 
@@ -22,6 +23,7 @@
 	let locked = $state(false);
 	let theme = $state<'light' | 'dark'>('light');
 	let drawMode = $state(false);
+	let modelStudioOpen = $state(false);
 
 	// tema-fargane som css-variablar for Hud/Sheet/Toolbar og body
 	const applyTheme = () => {
@@ -260,7 +262,7 @@
 
 <canvas bind:this={canvas}></canvas>
 <Hud text={hudText} visible={hudVisible} />
-<Toolbar {locked} {theme} {drawMode} {act} />
+<Toolbar {locked} {theme} {drawMode} {act} onmodel={() => modelStudioOpen = true} />
 <Sheet
 	open={sheetOpen}
 	x={sheetX}
@@ -270,6 +272,7 @@
 	onimport={doImport}
 	onclose={closeSheet}
 />
+<ModelStudio open={modelStudioOpen} onclose={() => modelStudioOpen = false} />
 
 <style>
 	canvas {

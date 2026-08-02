@@ -5,12 +5,14 @@
 		locked = false,
 		theme = 'light',
 		drawMode = false,
-		act
+		act,
+		onmodel
 	}: {
 		locked?: boolean;
 		theme?: 'light' | 'dark';
 		drawMode?: boolean;
 		act: (a: Action) => void;
+		onmodel: () => void;
 	} = $props();
 
 	let el: HTMLDivElement | undefined = $state();
@@ -22,6 +24,9 @@
 </script>
 
 <div class="bar" bind:this={el}>
+	<button class="knapp modell" title="last inn og plasser GLB" aria-label="opne GLB-studio" onpointerdown={(e) => { e.stopPropagation(); onmodel(); }}>
+		<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.8l5.5 3.1v6.2L8 14.2l-5.5-3.1V4.9zM2.5 4.9L8 8l5.5-3.1M8 8v6.2" /></svg>
+	</button>
 	<button
 		class="knapp"
 		class:daud={locked}
@@ -149,6 +154,7 @@
 		color: var(--fp-blue, #1155cc);
 		border-color: var(--fp-blue, #1155cc);
 	}
+	.knapp.modell { opacity: .8; color: var(--fp-blue, #1155cc); }
 	.knapp.daud {
 		opacity: 0.15;
 		cursor: default;
